@@ -1,0 +1,19 @@
+# Node.js
+node_modules/
+dist/
+package-lock.json
+npm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Development / OS / CLI Tools
+.antigravitycli/
+scratch/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+  "name": "focussentinel",
+  "version": "0.1.0",
+  "description": "Privacy-first, local-only digital study evaluator",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "npm run build && electron ."
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "typescript": "^5.4.0",
+    "@types/node": "^20.11.0"
+  }
+}
