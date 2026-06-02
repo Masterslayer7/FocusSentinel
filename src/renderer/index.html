@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusSentinel - Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo">
+        <span class="logo-icon">👁️</span>
+        <span class="logo-text">Focus<span class="logo-accent">Sentinel</span></span>
+      </div>
+      <div class="status-badge" id="status-badge">
+        <span class="pulse-dot"></span> Pipeline Connecting...
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="card control-card">
+        <div class="card-header">
+          <h2>IPC Control Board</h2>
+          <span class="tag">Standard Input</span>
+        </div>
+        <p class="section-desc">Transmit control payloads to the Python child process stdio stream.</p>
+        <div class="button-group">
+          <button id="btn-ping" class="btn btn-primary">
+            <span class="btn-icon">⚡</span> Send Ping Command
+          </button>
+          <button id="btn-focus" class="btn btn-success">
+            <span class="btn-icon">🎯</span> Transition to FOCUS State
+          </button>
+          <button id="btn-break" class="btn btn-warning">
+            <span class="btn-icon">☕</span> Transition to BREAK State
+          </button>
+        </div>
+      </section>
+
+      <section class="card telemetry-card">
+        <div class="card-header">
+          <h2>Computer Vision Telemetry</h2>
+          <span class="tag tag-live">Standard Output</span>
+        </div>
+        <p class="section-desc">Real-time frame metrics streaming directly from the Python stdout channel.</p>
+        
+        <div class="telemetry-display">
+          <div class="telemetry-grid">
+            <div class="metric">
+              <span class="metric-label">Head Yaw</span>
+              <span class="metric-value" id="val-yaw">--</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Head Pitch</span>
+              <span class="metric-value" id="val-pitch">--</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Phone Detection</span>
+              <span class="metric-status" id="val-phone">Scanning...</span>
+            </div>
+          </div>
+
+          <div class="log-console">
+            <div class="console-header">
+              <span>Raw JSON Stream Packet Console</span>
+              <button id="btn-clear" class="btn-clear">Clear Logs</button>
+            </div>
+            <div class="console-body" id="log-body">
+              <div class="log-line system-msg">[Bridge] System initialized. Waiting for pipeline stream...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <!-- Since the renderer is written in TypeScript, we reference the compiled output -->
+  <script src="../../dist/renderer/renderer.js"></script>
+</body>
+</html>
