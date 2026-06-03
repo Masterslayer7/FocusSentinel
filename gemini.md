@@ -39,6 +39,14 @@ The following conditional rules apply to all development activities:
 * **IF** you introduce a new dependency, library, or make a structural architectural pivot:
 * **THEN** you must explicitly prompt the user to ask if a new Architectural Decision Record (ADR) should be created in `docs/adr/`.
 
+### Rule 5: Stdout Protection (Python Logs)
+* **IF** you write logs, debug output, or warning print statements in the Python CV pipeline:
+* **THEN** you must output them strictly to `sys.stderr` using the custom logging module. Standard output (`sys.stdout`) is reserved exclusively for raw NDJSON telemetry packets.
+
+### Rule 6: Telemetry Payload Typing
+* **IF** you add new telemetry parameters or commands:
+* **THEN** you must define corresponding TypeScript interfaces (e.g., in a dedicated `types.ts` file) to enforce type safety on all IPC message payloads.
+
 ---
 
 ## File Directory Mapping
