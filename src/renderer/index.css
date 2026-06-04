@@ -36,15 +36,19 @@ body {
   font-family: var(--font-family);
   height: 100vh;
   overflow: hidden;
-  padding: 24px;
+  padding: 0; /* Clear padding to draw border at outer edge */
+  margin: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12); /* Clean window border */
+  box-sizing: border-box;
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 24px; /* Apply padding here to keep spacing */
+  box-sizing: border-box;
 }
 
 /* Header */
@@ -195,6 +199,7 @@ body {
   display: flex;
   flex-direction: column;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 0; /* Prevents card from expanding beyond grid tracks */
 }
 
 .card:hover {
