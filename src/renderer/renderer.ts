@@ -4,6 +4,9 @@ interface Window {
   api: {
     onTelemetry: (callback: (data: any) => void) => () => void;
     sendCommand: (action: string, data?: Record<string, any>) => void;
+    minimize: () => void;
+    maximize: () => void;
+    close: () => void;
   };
 }
 
@@ -13,6 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnBreak = document.getElementById('btn-break');
   const btnClear = document.getElementById('btn-clear');
   const statusBadge = document.getElementById('status-badge');
+
+  const winMin = document.getElementById('win-min');
+  const winMax = document.getElementById('win-max');
+  const winClose = document.getElementById('win-close');
   
   const valYaw = document.getElementById('val-yaw');
   const valPitch = document.getElementById('val-pitch');
@@ -53,6 +60,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnClear?.addEventListener('click', () => {
     if (logBody) logBody.innerHTML = '';
+  });
+
+  // Bind custom Window Controls
+  winMin?.addEventListener('click', () => {
+    window.api.minimize();
+  });
+
+  winMax?.addEventListener('click', () => {
+    window.api.maximize();
+  });
+
+  winClose?.addEventListener('click', () => {
+    window.api.close();
   });
 
   // Start listening to the Python telemetry stream

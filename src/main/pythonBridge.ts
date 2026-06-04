@@ -38,8 +38,9 @@ export class PythonBridge extends EventEmitter {
 
     // Handle standard error (application logs / printouts)
     this.childProcess.stderr?.on('data', (chunk: Buffer) => {
-
-      //Removes the \n, preventing the generation of an empty string element in the array
+      // Convert chunk buffer to string. We call trim() before split('\n')
+      // to avoid a trailing empty string element since stderr outputs
+      // typically end with a trailing newline (\n or \r\n).
       const logLines = chunk.toString('utf8').trim().split('\n');
       for (const line of logLines) {
         if (line.trim()) {
@@ -65,11 +66,21 @@ export class PythonBridge extends EventEmitter {
 
   /**
    * Processes the buffered stdout data, splitting on newlines and parsing JSON.
+   * 
+   * Stream Fragmentation Protocol:
+   * Because data from the Python process streams in chunks of arbitrary size,
+   * a single chunk may contain incomplete JSON or multiple messages merged together.
+   * To handle this, we assume a contract where each message ends with a newline (\n).
+   * 
+   * We accumulate incoming chunks in stdoutBuffer, search for line boundaries (\n),
+   * extract and parse completed lines, and keep any remaining incomplete lines in the buffer.
    */
   private processBuffer() {
     let newlineIndex = this.stdoutBuffer.indexOf('\n');
     while (newlineIndex !== -1) {
+      // Extract the full message up to the newline delimiter
       const line = this.stdoutBuffer.substring(0, newlineIndex).trim();
+      // Retain the remaining part of the stream in the buffer
       this.stdoutBuffer = this.stdoutBuffer.substring(newlineIndex + 1);
 
       if (line) {

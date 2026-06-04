@@ -19,5 +19,18 @@ contextBridge.exposeInMainWorld('api', {
    */
   sendCommand: (action: string, data: Record<string, any> = {}) => {
     ipcRenderer.send('send-to-python', { action, data });
+  },
+
+  /**
+   * Custom window operation commands
+   */
+  minimize: () => {
+    ipcRenderer.send('window-minimize');
+  },
+  maximize: () => {
+    ipcRenderer.send('window-maximize');
+  },
+  close: () => {
+    ipcRenderer.send('window-close');
   }
 });

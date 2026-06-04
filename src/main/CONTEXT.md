@@ -22,6 +22,12 @@ The bridge communicates with Python using standard I/O (stdio) streams with Newl
 * **`'close' (code: number | null)`**: Triggered when the Python process exits.
 * **`'error' (err: Error)`**: Triggered if the process fails to spawn.
 
+### IPC Window Control Listeners
+The main process intercepts the following desktop window commands from the renderer via the preload bridge:
+* **`window-minimize`**: Minimizes the desktop window.
+* **`window-maximize`**: Toggles standard maximized and unmaximized window sizes.
+* **`window-close`**: Triggers a window close operation, which subsequently tears down the active PythonBridge connection.
+
 ---
 
 ## Data & Process Flow
