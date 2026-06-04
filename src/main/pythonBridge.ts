@@ -38,6 +38,8 @@ export class PythonBridge extends EventEmitter {
 
     // Handle standard error (application logs / printouts)
     this.childProcess.stderr?.on('data', (chunk: Buffer) => {
+
+      //Removes the \n, preventing the generation of an empty string element in the array
       const logLines = chunk.toString('utf8').trim().split('\n');
       for (const line of logLines) {
         if (line.trim()) {
