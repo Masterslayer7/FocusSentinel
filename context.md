@@ -1,9 +1,9 @@
 # Project Context: FocusSentinel
 
 ## Overview
-FocusSentinel is a privacy-first, local-only desktop application designed to act as a strict digital study evaluator. It uses real-time computer vision to monitor distraction vectors (head pose, gaze, object detection) and leverages a local Large Language Model (LLM) and Text-to-Speech (TTS) to deliver verbal reprimands or encouragement based on an integrated Pomodoro state machine. 
+FocusSentinel is a privacy-first, local-only desktop application designed to act as a strict digital study evaluator. It uses real-time computer vision to monitor physical distraction events (specifically focusing on mobile phone usage) and leverages a local Large Language Model (LLM) and Text-to-Speech (TTS) to deliver verbal reprimands or encouragement based on an integrated Pomodoro state machine. 
 
-**Core Philosophy:** Zero data retention. Air-gapped privacy by default. Authoritative but helpful persona.
+**Core Philosophy:** Zero data retention. Air-gapped privacy by default. Authoritative but helpful persona. Minimally intrusive.
 
 ## Architecture & Tech Stack
 The application relies on a multi-process architecture to separate the frontend UI from the heavy computer vision pipeline, communicating strictly via Standard I/O (stdio) to avoid network/port exposure.
@@ -15,8 +15,8 @@ The application relies on a multi-process architecture to separate the frontend 
 
 ### 2. Computer Vision Pipeline (Python)
 * **Language:** Python
-* **Libraries:** OpenCV (frame capture), MediaPipe (facial landmarks, head pose, EAR), YOLOv8 Nano (lightweight object detection for `cell_phone`).
-* **Role:** Runs in the background, extracts spatial vectors, and immediately drops the matrix frames. Emits telemetry (e.g., `yaw`, `pitch`, `phone_detected`) to `stdout`.
+* **Libraries:** OpenCV (frame capture), YOLOv8 Nano (lightweight object detection for `cell_phone`).
+* **Role:** Runs in the background, executes inference on frame streams, and immediately drops the matrix frames from memory. Emits telemetry (e.g., `phone_detected` and coordinate box metadata) to `stdout`.
 
 ### 3. Evaluator Engine (Local AI)
 * **LLM Engine:** `node-llama-cpp` running a quantized local model (e.g., Llama 3 8B or Phi-3 Mini) via the Node.js Main Process.
@@ -25,8 +25,8 @@ The application relies on a multi-process architecture to separate the frontend 
 
 ## System States (Pomodoro Master Controller)
 The behavior of all processes depends on the active timer state:
-* **STATE_FOCUS:** Vision pipeline polls at high frequency. LLM persona is strict and highly reactive to distractions.
-* **STATE_BREAK:** Vision pipeline is suspended (camera released, CPU usage drops). LLM persona is relaxed and encourages hydration/stretching.
+* **STATE_FOCUS:** Vision pipeline actively scans the video frames for phone presence. The LLM evaluator reacts if a phone is detected.
+* **STATE_BREAK:** Vision pipeline is suspended (camera released, CPU usage drops to 0%). The LLM evaluator is relaxed and encourages hydration/stretching.
 
 ## Strict Engineering Constraints & Rules for AI Assistants
 
@@ -47,4 +47,4 @@ When generating or modifying code for this project, you MUST adhere strictly to 
 
 4. **Code Quality:**
    * Use strict TypeScript typing for all IPC (Inter-Process Communication) payloads.
-   * Keep Python modules decoupled (e.g., separate classes for `PoseEstimator`, `ObjectDetector`, and `StreamManager`).
+   * Keep Python modules decoupled (e.g., separate classes for `ObjectDetector` and `StreamManager`).
