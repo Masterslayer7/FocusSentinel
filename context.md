@@ -15,7 +15,7 @@ The application relies on a multi-process architecture to separate the frontend 
 
 ### 2. Computer Vision Pipeline (Python)
 * **Language:** Python
-* **Libraries:** OpenCV (frame capture), YOLOv8 Nano (lightweight object detection for `cell_phone`).
+* **Libraries:** OpenCV (frame capture), YOLO26 Nano (lightweight object detection for `cell_phone`).
 * **Role:** Runs in the background, executes inference on frame streams, and immediately drops the matrix frames from memory. Emits telemetry (e.g., `phone_detected` and coordinate box metadata) to `stdout`.
 
 ### 3. Evaluator Engine (Local AI)

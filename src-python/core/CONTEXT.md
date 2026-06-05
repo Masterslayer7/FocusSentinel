@@ -1,27 +1,22 @@
 # Core Computer Vision Module Context
 
-This module contains the core computer vision detection and evaluation algorithms. It captures frames from local camera feeds, analyzes landmark positions, performs spatial coordinates calculations, and identifies distraction objects in real-time.
+This module contains the core computer vision detection and evaluation algorithms. It captures frames from local camera feeds, runs inference on the frame stream to detect targeted objects, and immediately drops raw frames from memory to maintain absolute user privacy.
 
 ---
 
-## Planned Core Interfaces
+## Core Interfaces
 
-### 1. `PoseEstimator` Class
-* **Purpose:** Uses MediaPipe facial landmark features to determine head yaw, pitch, and roll angles to evaluate focus.
+### 1. `ObjectDetector` Class
+* **Purpose:** Employs a lightweight YOLO26 Nano model to detect distraction objects (specifically mobile phones) in the video frames.
 * **Public Methods:**
-  * `estimate_pose(image_matrix) -> Tuple[float, float, float]`: Takes a raw camera frame and returns yaw, pitch, and roll in degrees.
+  * `detect_objects(image_matrix) -> List[Dict]`: Processes the frame and returns confidence scores and bounding boxes for targeted objects (e.g. `cell_phone` class).
 
-### 2. `ObjectDetector` Class
-* **Purpose:** Employs a lightweight YOLOv8 Nano model to search for distraction vectors (specifically mobile phones).
-* **Public Methods:**
-  * `detect_objects(image_matrix) -> List[Dict]`: Processes the frame, returns confidence scores and bounding boxes for targeted objects (e.g. `cell_phone`), and filters out other classes.
-
-### 3. `CameraStream` Class
-* **Purpose:** Coordinates camera access, capture rate throttling, and frame dispatch.
+### 2. `CameraStream` Class
+* **Purpose:** Coordinates hardware camera access, capture rate throttling, and frame dispatch.
 * **Public Methods:**
   * `start_capture() -> None`: Initializes the OpenCV stream wrapper.
   * `read_frame() -> numpy.ndarray`: Retrieves the latest matrix frame from cache.
-  * `release() -> None`: Safely releases the hardware camera block.
+  * `release() -> None`: Safely releases the camera device block.
 
 ---
 
@@ -36,9 +31,8 @@ stateDiagram-v2
     
     state STATE_FOCUS {
         [*] --> CaptureFrame: 30 FPS Poll
-        CaptureFrame --> ExtractPose: MediaPipe FaceMesh
-        ExtractPose --> DetectPhone: YOLOv8
-        DetectPhone --> EmitNDJSON: stdout
+        CaptureFrame --> DetectPhone: YOLO26 Inference
+        DetectPhone --> EmitNDJSON: stdout (if phone detected)
         EmitNDJSON --> CaptureFrame
     }
     
@@ -49,6 +43,5 @@ stateDiagram-v2
 ```
 
 ## Dependencies
-* **MediaPipe** (facial landmark mesh tracking)
 * **OpenCV** (hardware stream video capture)
-* **Ultralytics YOLOv8** (object classification model)
+* **Ultralytics YOLO26** (object detection and classification model)
