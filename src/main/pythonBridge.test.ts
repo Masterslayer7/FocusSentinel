@@ -7,7 +7,7 @@ describe('PythonBridge Integration Tests', () => {
   // Resolve the path to the main.py python script
   const pythonScript = path.resolve(__dirname, '../../src-python/main.py');
 
-  test('should successfully spawn the python process and receive telemetry data', () => {
+  test('should successfully spawn the python process and receive telemetry data after state activation', () => {
     return new Promise<void>((resolve, reject) => {
       const bridge = new PythonBridge('python3', pythonScript);
       let telemetryCount = 0;
@@ -17,8 +17,6 @@ describe('PythonBridge Integration Tests', () => {
           telemetryCount++;
           try {
             assert.ok(payload.data);
-            assert.strictEqual(typeof payload.data.yaw, 'number');
-            assert.strictEqual(typeof payload.data.pitch, 'number');
             assert.strictEqual(typeof payload.data.phone_detected, 'boolean');
           } catch (e) {
             bridge.stop();
@@ -47,6 +45,11 @@ describe('PythonBridge Integration Tests', () => {
       });
 
       bridge.start();
+
+      // Trigger FOCUS state to activate camera/telemetry stream
+      setTimeout(() => {
+        bridge.sendCommand('change_state', { state: 'FOCUS' });
+      }, 300);
     });
   });
 
@@ -81,6 +84,48 @@ describe('PythonBridge Integration Tests', () => {
       // Give Python process a moment to initialize before sending ping command
       setTimeout(() => {
         bridge.sendCommand('ping');
+      }, 300);
+    });
+  });
+
+  test('should stream camera status updates when transitioning states', () => {
+    return new Promise<void>((resolve, reject) => {
+      const bridge = new PythonBridge('python3', pythonScript);
+      const receivedStatus: string[] = [];
+
+      bridge.on('message', (payload) => {
+        if (payload.type === 'status') {
+          receivedStatus.push(payload.camera);
+          
+          if (payload.camera === 'opened') {
+            // Once opened, request a transition to BREAK to trigger release
+            bridge.sendCommand('change_state', { state: 'BREAK' });
+          } else if (payload.camera === 'released') {
+            // Once released, stop the bridge and complete the test
+            bridge.stop();
+          }
+        }
+      });
+
+      bridge.on('close', (code) => {
+        try {
+          assert.strictEqual(code, 0);
+          assert.deepStrictEqual(receivedStatus, ['opened', 'released']);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+
+      bridge.on('error', (err) => {
+        reject(err);
+      });
+
+      bridge.start();
+
+      // Trigger transitions
+      setTimeout(() => {
+        bridge.sendCommand('change_state', { state: 'FOCUS' });
       }, 300);
     });
   });

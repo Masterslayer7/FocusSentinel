@@ -61,3 +61,40 @@ def test_handle_command_exit():
     with patch("main.os._exit") as mock_exit:
         main.handle_command(command)
         mock_exit.assert_called_once_with(0)
+
+def test_state_transition_updates_global_variable():
+    """
+    Verifies that handle_command updates the thread-safe global state variable.
+    """
+    # Reset state to BREAK
+    main.current_state = "BREAK"
+    
+    command = {"action": "change_state", "state": "FOCUS"}
+    main.handle_command(command)
+    
+    assert main.current_state == "FOCUS"
+
+def test_camera_state_activation_deactivation(capsys):
+    """
+    Verifies that shifting between FOCUS and BREAK states toggles the camera status
+    and sends standard status updates.
+    """
+    # Reset/Mock state
+    main.current_state = "FOCUS"
+    
+    # Run a single tick/iteration of the state loop logic
+    # In mock context, we want to test main's step logic in isolation.
+    # To facilitate testing, we can define or test a step function,
+    # or simulate the loop tick block. Let's test the state check directly:
+    cap = None
+    
+    # Transition to FOCUS
+    cap, output = main.execute_loop_tick(cap, "FOCUS")
+    assert cap is not None # Camera should be initialized (simulated)
+    assert output == {"type": "status", "camera": "opened"}
+    
+    # Transition to BREAK
+    cap, output = main.execute_loop_tick(cap, "BREAK")
+    assert cap is None # Camera should be released
+    assert output == {"type": "status", "camera": "released"}
+

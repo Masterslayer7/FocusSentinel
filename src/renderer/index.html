@@ -39,12 +39,17 @@
           <button id="btn-ping" class="btn btn-primary">
             <span class="btn-icon">⚡</span> Send Ping Command
           </button>
-          <button id="btn-focus" class="btn btn-success">
-            <span class="btn-icon">🎯</span> Transition to FOCUS State
-          </button>
-          <button id="btn-break" class="btn btn-warning">
-            <span class="btn-icon">☕</span> Transition to BREAK State
-          </button>
+          
+          <div class="switch-container">
+            <div class="switch-text">
+              <span class="switch-title">Focus Mode</span>
+              <span class="switch-status" id="switch-status">Inactive (Camera Off)</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="focus-switch">
+              <span class="slider"></span>
+            </label>
+          </div>
         </div>
       </section>
 

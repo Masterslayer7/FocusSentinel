@@ -5,6 +5,11 @@ import threading
 import time
 from utils.logger import log
 
+# Thread-safe state variables
+state_lock = threading.Lock()
+current_state = "BREAK"
+
+
 def read_stdin():
     """
     Reads JSON commands from stdin in a separate thread.
@@ -34,19 +39,39 @@ def read_stdin():
             break
 
 def handle_command(command):
-    """Processes commands sent by the Electron orchestrator."""
+    """Processes commands [Json] sent by the Electron orchestrator."""
+    global current_state
     action = command.get("action")
     if action == "ping":
         send_response({"type": "pong"})
     elif action == "change_state":
         state = command.get("state")
+        with state_lock:
+            current_state = state
         log(f"State transition request received: {state}", "INFO")
-        # In implementation, this will toggle CV modules (e.g. pause camera in break mode)
     elif action == "exit":
         log("Exit command received. Shutting down.", "INFO")
         os._exit(0)
     else:
         log(f"Unknown action received: {action}", "WARNING")
+
+def execute_loop_tick(cap, state):
+    """
+    Processes a single iteration of the camera capture state machine.
+    Returns the updated capture object and any status responses.
+    """
+    response = None
+    if state == "FOCUS":
+        if cap is None:
+            log("Entering FOCUS mode. Opening camera...", "INFO")
+            cap = "MOCK_CAP"  # Placeholder representing camera instance
+            response = {"type": "status", "camera": "opened"}
+    else:  # state == "BREAK"
+        if cap is not None:
+            log("Entering BREAK mode. Releasing camera...", "INFO")
+            cap = None
+            response = {"type": "status", "camera": "released"}
+    return cap, response
 
 def send_response(payload):
     """
@@ -60,27 +85,39 @@ def send_response(payload):
         log(f"Failed to write to stdout: {e}", "ERROR")
 
 def main():
+    global current_state
     log("Initializing Python CV Pipeline...", "INFO")
     
     # Start stdin reader thread as a daemon so it exits when main exits
     stdin_thread = threading.Thread(target=read_stdin, daemon=True)
     stdin_thread.start()
     
-    log("Main loop started. Emitting heartbeat telemetry...", "INFO")
+    log("Main loop started.", "INFO")
+    cap = None
     try:
         while True:
-            # Emit telemetry frame to demonstrate active connection
-            telemetry = {
-                "type": "telemetry",
-                "timestamp": time.time(),
-                "data": {
-                    "yaw": 0.0,
-                    "pitch": 0.0,
-                    "phone_detected": False
+            with state_lock:
+                state = current_state
+            
+            # Execute state machine tick
+            cap, status_response = execute_loop_tick(cap, state)
+            if status_response:
+                send_response(status_response)
+            
+            if state == "FOCUS":
+                # Emit telemetry frame to demonstrate active connection
+                telemetry = {
+                    "type": "telemetry",
+                    "timestamp": time.time(),
+                    "data": {
+                        "phone_detected": False
+                    }
                 }
-            }
-            send_response(telemetry)
-            time.sleep(1.0)
+                send_response(telemetry)
+                time.sleep(1.0)
+            else:
+                # Sleep and wait in BREAK mode (low CPU usage)
+                time.sleep(0.5)
     except (KeyboardInterrupt, SystemExit):
         log("Shutting down gracefully.", "INFO")
     except Exception as e:

@@ -12,10 +12,10 @@ interface Window {
 
 document.addEventListener('DOMContentLoaded', () => {
   const btnPing = document.getElementById('btn-ping');
-  const btnFocus = document.getElementById('btn-focus');
-  const btnBreak = document.getElementById('btn-break');
   const btnClear = document.getElementById('btn-clear');
   const statusBadge = document.getElementById('status-badge');
+  const focusSwitch = document.getElementById('focus-switch') as HTMLInputElement | null;
+  const switchStatus = document.getElementById('switch-status');
 
   const winMin = document.getElementById('win-min');
   const winMax = document.getElementById('win-max');
@@ -48,18 +48,28 @@ document.addEventListener('DOMContentLoaded', () => {
     window.api.sendCommand('ping');
   });
 
-  btnFocus?.addEventListener('click', () => {
-    appendLog('[UI] Sending Command: change_state -> FOCUS', 'cmd');
-    window.api.sendCommand('change_state', { state: 'FOCUS' });
-  });
-
-  btnBreak?.addEventListener('click', () => {
-    appendLog('[UI] Sending Command: change_state -> BREAK', 'cmd');
-    window.api.sendCommand('change_state', { state: 'BREAK' });
-  });
-
   btnClear?.addEventListener('click', () => {
     if (logBody) logBody.innerHTML = '';
+  });
+
+  // Bind Focus Switch events
+  focusSwitch?.addEventListener('change', () => {
+    const isChecked = focusSwitch.checked;
+    if (isChecked) {
+      appendLog('[UI] Activating Focus Mode (Starting Camera)...', 'system');
+      window.api.sendCommand('change_state', { state: 'FOCUS' });
+      if (switchStatus) {
+        switchStatus.textContent = 'Active (Camera On)';
+        switchStatus.classList.add('active');
+      }
+    } else {
+      appendLog('[UI] Deactivating Focus Mode (Releasing Camera)...', 'system');
+      window.api.sendCommand('change_state', { state: 'BREAK' });
+      if (switchStatus) {
+        switchStatus.textContent = 'Inactive (Camera Off)';
+        switchStatus.classList.remove('active');
+      }
+    }
   });
 
   // Bind custom Window Controls
@@ -85,10 +95,23 @@ document.addEventListener('DOMContentLoaded', () => {
       appendLog('[Bridge] Connected to Python CV stream!', 'system');
     }
 
+    // Handle camera status responses (opened/released)
+    if (payload.type === 'status' && payload.camera && statusBadge) {
+      if (payload.camera === 'opened') {
+        statusBadge.innerHTML = '<span class="pulse-dot"></span> Pipeline Stream Active';
+        statusBadge.classList.add('connected');
+        appendLog('[Python Status] Camera Initialized and Active', 'system');
+      } else if (payload.camera === 'released') {
+        statusBadge.innerHTML = '<span class="pulse-dot" style="background-color: var(--color-warning); box-shadow: 0 0 10px var(--color-warning);"></span> Camera Released (Low Power)';
+        statusBadge.classList.remove('connected');
+        appendLog('[Python Status] Camera Released successfully', 'system');
+      }
+    }
+
     // Handle telemetry heartbeat
     if (payload.type === 'telemetry' && payload.data) {
-      if (valYaw) valYaw.textContent = `${payload.data.yaw.toFixed(1)}°`;
-      if (valPitch) valPitch.textContent = `${payload.data.pitch.toFixed(1)}°`;
+      if (valYaw) valYaw.textContent = 'Disabled';
+      if (valPitch) valPitch.textContent = 'Disabled';
       
       if (valPhone) {
         if (payload.data.phone_detected) {
