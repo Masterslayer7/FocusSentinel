@@ -28,6 +28,17 @@ The main process intercepts the following desktop window commands from the rende
 * **`window-maximize`**: Toggles standard maximized and unmaximized window sizes.
 * **`window-close`**: Triggers a window close operation, which subsequently tears down the active PythonBridge connection.
 
+### Window Loading & Dev Server Retry
+During development, the main process manages potential timing race conditions when loading the UI:
+* If `process.env.ELECTRON_IS_DEV === '1'` is set, Electron attempts to connect to the Vite dev server at `http://127.0.0.1:5173`.
+* A listener on the `did-fail-load` event catches connection failures (e.g., if Vite is still booting up) and automatically retries loading the URL after a 500ms delay.
+* If the flag is not set, it loads the pre-compiled production bundle directly from the filesystem at `dist/renderer/index.html`.
+
+### Graphics Acceleration & GPU Configuration
+To ensure hardware-accelerated rendering compatibility across development setups (especially WSL2/WSLg and virtual displays) without throwing graphics context errors:
+* **`disable-gpu-sandbox`**: Bypasses the GPU process sandbox to allow Electron to bind directly to virtual graphics nodes (like `/dev/dxg` or `/dev/dri/card*`).
+* **`ignore-gpu-blocklist`**: Bypasses Chromium's GPU driver blacklist to prevent falling back to slow software-based rasterizers.
+
 ---
 
 ## Data & Process Flow

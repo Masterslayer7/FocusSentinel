@@ -1,37 +1,43 @@
 # Renderer UI Context
 
-This module manages the user interface (UI) rendering and user interactions within the Electron window. It registers DOM event listeners, binds controls to the preload context bridge, and updates UI gauges based on telemetry data.
+This module manages the user interface (UI) rendering and user interactions within the Electron window using React, Vite, and TypeScript. It binds state parameters, coordinates IPC commands via the preload context bridge, and updates components based on incoming telemetry.
 
-## Interfaces & Bindings
+## Component Architecture
 
-### User Actions (Control Board)
-HTML button inputs bind to the bridge API to issue commands:
-* **`#btn-ping`**: Sends a `"ping"` payload down standard input to check pipeline responsiveness.
-* **`#btn-focus`**: Issues `{ action: "change_state", state: "FOCUS" }` to transition the system to study evaluation mode.
-* **`#btn-break`**: Issues `{ action: "change_state", state: "BREAK" }` to suspend CV capture during break times.
-* **`#btn-clear`**: Clears the console logging history on the screen.
+The UI is structured into modular functional components under `src/renderer/components/`:
 
-### Displays & Gauges
-The UI listens to `window.api.onTelemetry` and maps JSON fields to HTML elements:
-* **`#val-yaw`**: Renders coordinates (e.g. `12.5°`).
-* **`#val-pitch`**: Renders vertical pitch coordinates.
-* **`#val-phone`**: Toggles indicator classes depending on the boolean flag `phone_detected` (adds `.alert-active` with a text-pulse animation if true).
-* **`#log-body`**: Appends formatted packet prints to the custom console log.
-* **`#status-badge`**: Tracks the connection state (adds `.connected` and activates the green pulsing status indicator when the first telemetry heartbeat arrives).
+1. **`App.tsx`**: The parent controller component. It manages state hooks (`focusMode`, `cameraStatus`, `phoneDetected`, `streamLogs`), handles the telemetry channel subscription setup, and maps callback events down to specific views.
+2. **`Header.tsx`**: Renders the app logo header, the pulsing connection/camera status badge (`#status-badge`), and Electron window window control actions (minimize, maximize, close).
+3. **`ControlBoard.tsx`**: Manages user actions for standard input control:
+   - **Ping Command (`#btn-ping`)**: Issues a `"ping"` action down the IPC channel.
+   - **Focus Switch (`#focus-switch`)**: Toggles the overall Pomodoro focus state, triggering `{ action: "change_state", state: "FOCUS" | "BREAK" }` to start/stop the camera capture pipeline.
+4. **`TelemetryDisplay.tsx`**: Renders standard output telemetry metrics (e.g. Yaw, Pitch, Phone Detection state alerts) and embeds the log console.
+5. **`LogConsole.tsx`**: Encapsulates raw packet console log displays (`#log-body`) and provides a button to clear logs. It features a self-contained automatic scroll-to-bottom effect when logs are updated.
 
 ---
 
-## UI Components & DOM Bindings
+## Inter-Process Communication & Render Flow
 
 ```mermaid
 graph TD
-    UI[HTML DOM Window] -->|Click Event| MainScript[renderer.ts]
-    MainScript -->|window.api.sendCommand| Preload[Preload API Gateway]
+    User[User Click/Toggle] -->|React Event Handler| Comp[Subcomponent]
+    Comp -->|Callback Trigger| App[App.tsx]
+    App -->|window.api.sendCommand| Preload[Preload API Gateway]
     
-    Preload -->|onTelemetry callback| MainScript
-    MainScript -->|Update innerText / classList| UI
+    Preload -->|onTelemetry callback| App
+    App -->|React State Update| Comp
 ```
 
+---
+
+## Testing
+
+* **`App.test.tsx`**: UI test suite written in Vitest and React Testing Library (under a JSDOM environment). It uses a mock `window.api` telemetry callback loop to verify component rendering, state transitions, warning triggers, and mock IPC transmissions.
+* **`setupTests.ts`**: Sets up global mock interfaces for the Electron preload bridge in testing environments.
+
+---
+
 ## Dependencies
-* FocusSentinel CSS UI System: [index.css](file:///home/yugp/projects/FocusSentinel/src/renderer/index.css)
-* Preload context bridge script: [preload.ts](file:///home/yugp/projects/FocusSentinel/src/preload/preload.ts)
+* Bundler & Dev Server: [vite.config.ts](file:///home/yugp/projects/FocusSentinel/vite.config.ts)
+* Styling system: [index.css](file:///home/yugp/projects/FocusSentinel/src/renderer/index.css)
+* Preload context bridge: [preload.ts](file:///home/yugp/projects/FocusSentinel/src/preload/preload.ts)

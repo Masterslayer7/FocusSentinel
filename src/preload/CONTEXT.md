@@ -18,6 +18,15 @@ The main world context exposes a single `api` object on the global `window`:
   * `action`: Command identifier (e.g. `"ping"`, `"change_state"`).
   * `data`: Optional command metadata.
 
+### `window.api.minimize(): void`
+* **Purpose:** Requests the Main process to minimize the application window.
+
+### `window.api.maximize(): void`
+* **Purpose:** Requests the Main process to toggle the application window's maximized state.
+
+### `window.api.close(): void`
+* **Purpose:** Requests the Main process to close the application window and terminate the CV pipeline child process.
+
 ---
 
 ## Architecture & Security Boundary
