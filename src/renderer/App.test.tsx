@@ -16,8 +16,9 @@ describe('FocusSentinel App React UI', () => {
     });
   });
 
-  test('should render headers, controls, and telemetry gauges', () => {
+  test('should render headers, controls, and telemetry gauges', async () => {
     render(<App />);
+    expect(await screen.findByLabelText('Active Camera Source')).toBeDefined();
     
     expect(screen.getByText((content, element) => element?.textContent === 'FocusSentinel')).toBeDefined();
     expect(screen.getByText('Focus Mode')).toBeDefined();
@@ -28,6 +29,7 @@ describe('FocusSentinel App React UI', () => {
 
   test('should toggle focus switch and invoke window.api.sendCommand', async () => {
     render(<App />);
+    expect(await screen.findByLabelText('Active Camera Source')).toBeDefined();
     
     const toggle = screen.getByRole('checkbox') as HTMLInputElement;
     expect(toggle.checked).toBe(false);
@@ -53,6 +55,7 @@ describe('FocusSentinel App React UI', () => {
 
   test('should update UI when telemetry indicates phone is detected', async () => {
     render(<App />);
+    expect(await screen.findByLabelText('Active Camera Source')).toBeDefined();
     
     // Simulate telemetry packet inside act() block to trigger state updates
     await act(async () => {
@@ -69,6 +72,7 @@ describe('FocusSentinel App React UI', () => {
 
   test('should update status badge when camera is released', async () => {
     render(<App />);
+    expect(await screen.findByLabelText('Active Camera Source')).toBeDefined();
     
     // Simulate status change inside act() block
     await act(async () => {
@@ -79,5 +83,26 @@ describe('FocusSentinel App React UI', () => {
     });
     
     expect(await screen.findByText('Camera Released (Low Power)')).toBeDefined();
+  });
+
+  test('should render camera options and trigger window.api.sendCommand when camera is changed', async () => {
+    render(<App />);
+    
+    // Wait for the mock devices to be enumerated and rendered
+    const select = await screen.findByLabelText('Active Camera Source') as HTMLSelectElement;
+    expect(select).toBeDefined();
+    
+    // Check that both cameras are listed
+    expect(screen.getByText('FaceTime HD Camera')).toBeDefined();
+    expect(screen.getByText('USB Web Camera')).toBeDefined();
+    expect(select.value).toBe('0'); // Default to camera index 0
+    
+    // Change selected camera option to index 1
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '1' } });
+    });
+    
+    expect(select.value).toBe('1');
+    expect(window.api.sendCommand).toHaveBeenCalledWith('change_camera', { index: 1 });
   });
 });

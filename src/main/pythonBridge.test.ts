@@ -129,4 +129,49 @@ describe('PythonBridge Integration Tests', () => {
       }, 300);
     });
   });
+
+  test('should successfully switch cameras and receive camera index status updates', () => {
+    return new Promise<void>((resolve, reject) => {
+      const bridge = new PythonBridge('python3', pythonScript);
+      const cameraStatusHistory: any[] = [];
+
+      bridge.on('message', (payload) => {
+        if (payload.type === 'status') {
+          cameraStatusHistory.push(payload);
+          
+          if (payload.camera_index === 0) {
+            // Switch to camera index 1 after index 0 status response
+            bridge.sendCommand('change_camera', { index: 1 });
+          } else if (payload.camera_index === 1) {
+            // Done testing both index status triggers
+            bridge.stop();
+          }
+        }
+      });
+
+      bridge.on('close', (code) => {
+        try {
+          assert.strictEqual(code, 0);
+          assert.ok(cameraStatusHistory.length >= 2);
+          const indices = cameraStatusHistory.map(h => h.camera_index);
+          assert.ok(indices.includes(0));
+          assert.ok(indices.includes(1));
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+
+      bridge.on('error', (err) => {
+        reject(err);
+      });
+
+      bridge.start();
+
+      // Transition to FOCUS mode to trigger camera opening
+      setTimeout(() => {
+        bridge.sendCommand('change_state', { state: 'FOCUS' });
+      }, 300);
+    });
+  });
 });

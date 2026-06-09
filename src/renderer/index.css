@@ -514,3 +514,50 @@ input:checked + .slider::before {
   color: var(--color-success);
   font-weight: bold;
 }
+
+/* Camera Selector Dropdown Styling */
+.camera-select-container {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--card-border);
+  padding: 16px;
+  border-radius: 12px;
+  margin-top: 12px;
+  gap: 8px;
+}
+
+.camera-select-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.camera-select-dropdown {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border);
+  color: var(--text-main);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.camera-select-dropdown:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.camera-select-dropdown:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.camera-select-dropdown option {
+  background: #0f172a;
+  color: var(--text-main);
+}

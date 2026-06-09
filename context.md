@@ -40,6 +40,7 @@ When generating or modifying code for this project, you MUST adhere strictly to 
 2. **Network Isolation:**
    * Default to 100% local operation. Do not use `fetch` or `axios` to call OpenAI, Anthropic, or external TTS APIs unless explicitly modifying the "Opt-In Cloud Settings" module.
    * Do not spin up Flask, FastAPI, or Express servers to communicate between Python and Node.js. Communication MUST be handled via `child_process.spawn` and `stdin`/`stdout` JSON streams.
+   * *Developer Stream Override:* Developers using WSL2 who cannot directly bind hardware USB cameras can stream their Windows webcam locally and set the `FOCUS_SENTINEL_CAMERA_SRC` environment variable (e.g., `http://localhost:5000/video_feed`) to feed it into the pipeline.
 
 3. **Performance & Throttling:**
    * The Python pipeline must run efficiently. Ensure proper `sys.stdout.flush()` usage so Node.js receives events without buffering delays.

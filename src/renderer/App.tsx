@@ -21,6 +21,33 @@ export default function App() {
   const [cameraStatus, setCameraStatus] = useState<'connecting' | 'active' | 'released'>('connecting');
   const [phoneDetected, setPhoneDetected] = useState(false);
   const [streamLogs, setStreamLogs] = useState<string[]>([]);
+  const [cameraIndex, setCameraIndex] = useState(0);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+
+  // Query and prompt camera devices permission on mount
+  useEffect(() => {
+    const initCameraAccess = async () => {
+      try {
+        // Trigger OS permission dialog via WebRTC getUserMedia, then close immediately
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        appendSystemLog(`Camera permission check: ${err}`);
+      }
+
+      // Enumerate available video sources
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputDevices = devices.filter(d => d.kind === 'videoinput');
+        setAvailableDevices(videoInputDevices);
+        appendSystemLog(`Discovered ${videoInputDevices.length} camera source(s).`);
+      } catch (err) {
+        appendSystemLog(`Error enumerating camera devices: ${err}`);
+      }
+    };
+
+    initCameraAccess();
+  }, []);
 
   useEffect(() => {
     appendSystemLog('System initialized. Waiting for pipeline stream...');
@@ -89,6 +116,12 @@ export default function App() {
     }
   };
 
+  const handleCameraChange = (index: number) => {
+    setCameraIndex(index);
+    appendSystemLog(`Switching to camera source index ${index}...`);
+    window.api.sendCommand('change_camera', { index });
+  };
+
   const handleClearLogs = () => {
     setStreamLogs([]);
   };
@@ -107,6 +140,9 @@ export default function App() {
           focusMode={focusMode}
           onToggleFocus={handleToggleFocus}
           onPing={handlePing}
+          cameraIndex={cameraIndex}
+          availableDevices={availableDevices}
+          onCameraChange={handleCameraChange}
         />
 
         <TelemetryDisplay

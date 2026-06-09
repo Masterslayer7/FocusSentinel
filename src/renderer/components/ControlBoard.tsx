@@ -4,12 +4,18 @@ interface ControlBoardProps {
   focusMode: boolean;
   onToggleFocus: (checked: boolean) => void;
   onPing: () => void;
+  cameraIndex: number;
+  availableDevices: MediaDeviceInfo[];
+  onCameraChange: (index: number) => void;
 }
 
 export const ControlBoard: React.FC<ControlBoardProps> = ({
   focusMode,
   onToggleFocus,
   onPing,
+  cameraIndex,
+  availableDevices,
+  onCameraChange,
 }) => {
   return (
     <section className="card control-card">
@@ -39,6 +45,26 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
             />
             <span className="slider"></span>
           </label>
+        </div>
+
+        <div className="camera-select-container">
+          <label htmlFor="camera-select" className="camera-select-label">Active Camera Source</label>
+          <select
+            id="camera-select"
+            className="camera-select-dropdown"
+            value={cameraIndex}
+            onChange={(e) => onCameraChange(Number(e.target.value))}
+          >
+            {availableDevices.length > 0 ? (
+              availableDevices.map((device, idx) => (
+                <option key={device.deviceId || idx} value={idx}>
+                  {device.label || `Camera ${idx}`}
+                </option>
+              ))
+            ) : (
+              <option value={0}>Camera 0 (Default)</option>
+            )}
+          </select>
         </div>
       </div>
     </section>

@@ -15,5 +15,6 @@ ENV/
 # Development / OS / CLI Tools
 .antigravitycli/
 scratch/
+.env
 .DS_Store
 Thumbs.db
