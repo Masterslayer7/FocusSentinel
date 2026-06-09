@@ -2,6 +2,11 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { PythonBridge } from './pythonBridge';
 
+// Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments without context failures
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
+const isDev = process.env.ELECTRON_IS_DEV === '1';
 let mainWindow: BrowserWindow | null = null;
 let pythonBridge: PythonBridge | null = null;
 
@@ -17,7 +22,18 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.resolve(__dirname, '../../src/renderer/index.html'));
+  if (isDev) {
+    mainWindow.loadURL('http://127.0.0.1:5173').catch(() => {});
+    mainWindow.webContents.on('did-fail-load', () => {
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL('http://127.0.0.1:5173').catch(() => {});
+        }
+      }, 500);
+    });
+  } else {
+    mainWindow.loadFile(path.resolve(__dirname, '../renderer/index.html'));
+  }
 
   mainWindow.on('closed', () => {
     mainWindow = null;

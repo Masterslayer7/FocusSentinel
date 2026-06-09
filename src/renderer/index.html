@@ -7,89 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="index.css">
+  <link rel="stylesheet" href="/index.css">
 </head>
 <body>
-  <div class="app-container">
-    <header class="app-header">
-      <div class="logo">
-        <span class="logo-icon">👁️</span>
-        <span class="logo-text">Focus<span class="logo-accent">Sentinel</span></span>
-      </div>
-      <div class="header-right">
-        <div class="status-badge" id="status-badge">
-          <span class="pulse-dot"></span> Pipeline Connecting...
-        </div>
-        <div class="window-controls">
-          <button id="win-min" class="win-btn" title="Minimize">&#8212;</button>
-          <button id="win-max" class="win-btn" title="Maximize">&#9633;</button>
-          <button id="win-close" class="win-btn win-btn-close" title="Close">&#10005;</button>
-        </div>
-      </div>
-    </header>
-
-    <main class="app-main">
-      <section class="card control-card">
-        <div class="card-header">
-          <h2>IPC Control Board</h2>
-          <span class="tag">Standard Input</span>
-        </div>
-        <p class="section-desc">Transmit control payloads to the Python child process stdio stream.</p>
-        <div class="button-group">
-          <button id="btn-ping" class="btn btn-primary">
-            <span class="btn-icon">⚡</span> Send Ping Command
-          </button>
-          
-          <div class="switch-container">
-            <div class="switch-text">
-              <span class="switch-title">Focus Mode</span>
-              <span class="switch-status" id="switch-status">Inactive (Camera Off)</span>
-            </div>
-            <label class="switch">
-              <input type="checkbox" id="focus-switch">
-              <span class="slider"></span>
-            </label>
-          </div>
-        </div>
-      </section>
-
-      <section class="card telemetry-card">
-        <div class="card-header">
-          <h2>Computer Vision Telemetry</h2>
-          <span class="tag tag-live">Standard Output</span>
-        </div>
-        <p class="section-desc">Real-time frame metrics streaming directly from the Python stdout channel.</p>
-        
-        <div class="telemetry-display">
-          <div class="telemetry-grid">
-            <div class="metric">
-              <span class="metric-label">Head Yaw</span>
-              <span class="metric-value" id="val-yaw">--</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label">Head Pitch</span>
-              <span class="metric-value" id="val-pitch">--</span>
-            </div>
-            <div class="metric">
-              <span class="metric-label">Phone Detection</span>
-              <span class="metric-status" id="val-phone">Scanning...</span>
-            </div>
-          </div>
-
-          <div class="log-console">
-            <div class="console-header">
-              <span>Raw JSON Stream Packet Console</span>
-              <button id="btn-clear" class="btn-clear">Clear Logs</button>
-            </div>
-            <div class="console-body" id="log-body">
-              <div class="log-line system-msg">[Bridge] System initialized. Waiting for pipeline stream...</div>
-            </div>
-          </div>
-        </div>
-      </section>
-    </main>
-  </div>
-  <!-- Since the renderer is written in TypeScript, we reference the compiled output -->
-  <script src="../../dist/renderer/renderer.js"></script>
+  <div id="root"></div>
+  <script type="module" src="/main.tsx"></script>
 </body>
 </html>
