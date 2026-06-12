@@ -7,6 +7,12 @@ interface ControlBoardProps {
   cameraIndex: number;
   availableDevices: MediaDeviceInfo[];
   onCameraChange: (index: number) => void;
+  threshold: number;
+  onThresholdChange: (val: number) => void;
+  model: string;
+  onModelChange: (val: string) => void;
+  imgsz: number;
+  onImgszChange: (val: number) => void;
 }
 
 export const ControlBoard: React.FC<ControlBoardProps> = ({
@@ -16,6 +22,12 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
   cameraIndex,
   availableDevices,
   onCameraChange,
+  threshold,
+  onThresholdChange,
+  model,
+  onModelChange,
+  imgsz,
+  onImgszChange,
 }) => {
   return (
     <section className="card control-card">
@@ -65,6 +77,55 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
               <option value={0}>Camera 0 (Default)</option>
             )}
           </select>
+        </div>
+
+        <div className="vision-settings-row">
+          <div className="slider-container">
+            <div className="slider-header">
+              <label htmlFor="threshold-slider" className="slider-label">Detection Confidence</label>
+              <span className="slider-value">{(threshold * 100).toFixed(0)}%</span>
+            </div>
+            <input
+              id="threshold-slider"
+              type="range"
+              min="0.20"
+              max="0.90"
+              step="0.05"
+              value={threshold}
+              onChange={(e) => onThresholdChange(Number(e.target.value))}
+              className="settings-slider"
+            />
+          </div>
+
+          <div className="model-select-container">
+            <label htmlFor="model-select" className="model-select-label">Vision Model Weights</label>
+            <select
+              id="model-select"
+              className="model-select-dropdown"
+              value={model}
+              onChange={(e) => onModelChange(e.target.value)}
+            >
+              <option value="yolo26n.pt">YOLO Nano (Low CPU)</option>
+              <option value="yolo26s.pt">YOLO Small (Medium CPU)</option>
+              <option value="yolo11m.pt">YOLO Medium (High Accuracy)</option>
+              <option value="yolo11l.pt">YOLO Large (Very High Accuracy)</option>
+              <option value="yolo11x.pt">YOLO X-Large (Max Accuracy)</option>
+            </select>
+          </div>
+
+          <div className="model-select-container">
+            <label htmlFor="imgsz-select" className="model-select-label">Detection Range (Resolution)</label>
+            <select
+              id="imgsz-select"
+              className="model-select-dropdown"
+              value={imgsz}
+              onChange={(e) => onImgszChange(Number(e.target.value))}
+            >
+              <option value={640}>Standard (640px)</option>
+              <option value={960}>Extended (960px)</option>
+              <option value={1280}>Maximum (1280px)</option>
+            </select>
+          </div>
         </div>
       </div>
     </section>

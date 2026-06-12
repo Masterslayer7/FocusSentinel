@@ -105,4 +105,46 @@ describe('FocusSentinel App React UI', () => {
     expect(select.value).toBe('1');
     expect(window.api.sendCommand).toHaveBeenCalledWith('change_camera', { index: 1 });
   });
+
+  test('should render threshold slider and trigger sendCommand when threshold changes', async () => {
+    render(<App />);
+    const slider = await screen.findByLabelText('Detection Confidence') as HTMLInputElement;
+    expect(slider).toBeDefined();
+    expect(slider.value).toBe('0.75'); // Default value
+
+    await act(async () => {
+      fireEvent.change(slider, { target: { value: '0.6' } });
+    });
+
+    expect(slider.value).toBe('0.6');
+    expect(window.api.sendCommand).toHaveBeenCalledWith('change_threshold', { threshold: 0.6 });
+  });
+
+  test('should render model selector and trigger sendCommand when model changes', async () => {
+    render(<App />);
+    const select = await screen.findByLabelText('Vision Model Weights') as HTMLSelectElement;
+    expect(select).toBeDefined();
+    expect(select.value).toBe('yolo11l.pt'); // Default value
+
+    await act(async () => {
+      fireEvent.change(select, { target: { value: 'yolo26s.pt' } });
+    });
+
+    expect(select.value).toBe('yolo26s.pt');
+    expect(window.api.sendCommand).toHaveBeenCalledWith('change_model', { model: 'yolo26s.pt' });
+  });
+
+  test('should render resolution selector and trigger sendCommand when imgsz changes', async () => {
+    render(<App />);
+    const select = await screen.findByLabelText('Detection Range (Resolution)') as HTMLSelectElement;
+    expect(select).toBeDefined();
+    expect(select.value).toBe('640'); // Default value
+
+    await act(async () => {
+      fireEvent.change(select, { target: { value: '960' } });
+    });
+
+    expect(select.value).toBe('960');
+    expect(window.api.sendCommand).toHaveBeenCalledWith('change_imgsz', { imgsz: 960 });
+  });
 });

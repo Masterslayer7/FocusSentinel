@@ -177,4 +177,36 @@ def test_camera_source_env_override():
             assert output == {"type": "status", "camera": "opened", "camera_index": 0}
 
 
+def test_handle_command_change_threshold():
+    """
+    Verifies that receiving change_threshold command updates current_threshold.
+    """
+    main.current_threshold = 0.45
+    command = {"action": "change_threshold", "threshold": 0.60}
+    main.handle_command(command)
+    assert main.current_threshold == 0.60
+
+
+def test_handle_command_change_model():
+    """
+    Verifies that receiving change_model command updates current_model_name.
+    """
+    main.current_model_name = "yolo26n.pt"
+    command = {"action": "change_model", "model": "yolo26s.pt"}
+    main.handle_command(command)
+    assert main.current_model_name == "yolo26s.pt"
+
+
+def test_handle_command_change_imgsz():
+    """
+    Verifies that receiving change_imgsz command updates current_imgsz.
+    """
+    main.current_imgsz = 640
+    command = {"action": "change_imgsz", "imgsz": 960}
+    main.handle_command(command)
+    assert main.current_imgsz == 960
+
+
+
+
 

@@ -23,6 +23,9 @@ export default function App() {
   const [streamLogs, setStreamLogs] = useState<string[]>([]);
   const [cameraIndex, setCameraIndex] = useState(0);
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+  const [threshold, setThreshold] = useState(0.75);
+  const [model, setModel] = useState('yolo11l.pt');
+  const [imgsz, setImgsz] = useState(640);
 
   // Query and prompt camera devices permission on mount
   useEffect(() => {
@@ -122,6 +125,24 @@ export default function App() {
     window.api.sendCommand('change_camera', { index });
   };
 
+  const handleThresholdChange = (val: number) => {
+    setThreshold(val);
+    appendSystemLog(`Confidence threshold updated to ${(val * 100).toFixed(0)}%`);
+    window.api.sendCommand('change_threshold', { threshold: val });
+  };
+
+  const handleModelChange = (val: string) => {
+    setModel(val);
+    appendSystemLog(`YOLO model changed to ${val}. Reloading detector...`);
+    window.api.sendCommand('change_model', { model: val });
+  };
+
+  const handleImgszChange = (val: number) => {
+    setImgsz(val);
+    appendSystemLog(`Inference resolution set to ${val}px`);
+    window.api.sendCommand('change_imgsz', { imgsz: val });
+  };
+
   const handleClearLogs = () => {
     setStreamLogs([]);
   };
@@ -143,6 +164,12 @@ export default function App() {
           cameraIndex={cameraIndex}
           availableDevices={availableDevices}
           onCameraChange={handleCameraChange}
+          threshold={threshold}
+          onThresholdChange={handleThresholdChange}
+          model={model}
+          onModelChange={handleModelChange}
+          imgsz={imgsz}
+          onImgszChange={handleImgszChange}
         />
 
         <TelemetryDisplay

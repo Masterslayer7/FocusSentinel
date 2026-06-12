@@ -10,7 +10,7 @@ def test_detector_initialization():
     with patch("core.detector.YOLO") as mock_yolo:
         detector = ObjectDetector(model_path="models/yolo26n.pt")
         mock_yolo.assert_called_once_with("models/yolo26n.pt")
-        assert detector.threshold == 0.45
+        assert detector.threshold == 0.75
 
 
 def test_detector_no_detections():
