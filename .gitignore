@@ -11,6 +11,8 @@ __pycache__/
 .venv/
 venv/
 ENV/
+src-python/models/
+*.pt
 
 # Development / OS / CLI Tools
 .antigravitycli/

@@ -7,16 +7,15 @@ This module contains the core computer vision detection and evaluation algorithm
 ## Core Interfaces
 
 ### 1. `ObjectDetector` Class
-* **Purpose:** Employs a lightweight YOLO26 Nano model to detect distraction objects (specifically mobile phones) in the video frames.
+* **Purpose:** Employs a lightweight YOLO model (`yolo26n.pt` downloaded to models directory) via Ultralytics to detect physical distraction objects (specifically mobile phones) in video frame matrices.
 * **Public Methods:**
-  * `detect_objects(image_matrix) -> List[Dict]`: Processes the frame and returns confidence scores and bounding boxes for targeted objects (e.g. `cell_phone` class).
+  * `detect_phone(frame) -> bool`: Processes an OpenCV frame matrix and returns `True` if a cell phone (COCO class ID `67`) is detected with confidence higher than the threshold (default: 0.45).
 
-### 2. `CameraStream` Class
-* **Purpose:** Coordinates hardware camera access, capture rate throttling, and frame dispatch.
-* **Public Methods:**
-  * `start_capture() -> None`: Initializes the OpenCV stream wrapper.
-  * `read_frame() -> numpy.ndarray`: Retrieves the latest matrix frame from cache.
-  * `release() -> None`: Safely releases the camera device block.
+### 2. Camera Management (State Machine in `main.py`)
+* **Purpose:** Manages the active hardware camera stream, coordinates state-dependent capture, and fallbacks cleanly.
+* **Key Components:**
+  * `execute_loop_tick(cap, state, target_camera_index)`: Checks for state shifts or camera index changes. Safely releases old cameras and spawns the new index.
+  * `MockVideoCapture`: A robust dummy fallback stream that initializes when camera devices are unavailable, preventing infinite blocking and test hangs.
 
 ---
 
@@ -30,18 +29,19 @@ stateDiagram-v2
     STATE_FOCUS --> STATE_BREAK: Break Starts ("change_state: BREAK")
     
     state STATE_FOCUS {
-        [*] --> CaptureFrame: 30 FPS Poll
-        CaptureFrame --> DetectPhone: YOLO26 Inference
-        DetectPhone --> EmitNDJSON: stdout (if phone detected)
+        [*] --> CaptureFrame: 1-second Loop Tick
+        CaptureFrame --> DetectPhone: YOLO Inference (class 67)
+        DetectPhone --> EmitNDJSON: stdout {"type": "telemetry", "data": {"phone_detected": bool}}
         EmitNDJSON --> CaptureFrame
     }
     
     state STATE_BREAK {
         [*] --> ReleaseCamera: Camera Closed
-        ReleaseCamera --> Idle: Low CPU Usage
+        ReleaseCamera --> Idle: Low CPU Usage (Sleep 0.5s)
     }
 ```
 
 ## Dependencies
-* **OpenCV** (hardware stream video capture)
-* **Ultralytics YOLO26** (object detection and classification model)
+* **OpenCV (opencv-python)** (hardware video stream capture)
+* **Ultralytics YOLO** (object detection framework)
+

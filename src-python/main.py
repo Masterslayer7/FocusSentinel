@@ -5,6 +5,7 @@ import threading
 import time
 import cv2
 from utils.logger import log
+from core.detector import ObjectDetector
 
 # Thread-safe state variables
 state_lock = threading.Lock()
@@ -74,6 +75,23 @@ class MockVideoCapture:
     def release(self):
         pass
 
+def _try_open_camera(source, result_dict):
+    """Attempt to open cv2.VideoCapture in a background thread."""
+    try:
+        cap_obj = cv2.VideoCapture(source)
+        if cap_obj.isOpened():
+            if result_dict.get("timed_out", False):
+                log(f"Background camera open succeeded after timeout for source {source}. Releasing...", "WARNING")
+                cap_obj.release()
+            else:
+                result_dict["cap"] = cap_obj
+                result_dict["success"] = True
+        else:
+            result_dict["success"] = False
+    except Exception as e:
+        log(f"Error in background camera opening thread: {e}", "ERROR")
+        result_dict["success"] = False
+
 def execute_loop_tick(cap, state, target_camera_index=0):
     """
     Processes a single iteration of the camera capture state machine.
@@ -82,8 +100,11 @@ def execute_loop_tick(cap, state, target_camera_index=0):
     global active_camera_index
     response = None
     
-    # Resolve the camera source: check env variable first, fall back directly to target index
-    camera_source = os.environ.get("FOCUS_SENTINEL_CAMERA_SRC", target_camera_index)
+    # Resolve the camera source: check env variable first if default index is requested
+    if target_camera_index == 0:
+        camera_source = os.environ.get("FOCUS_SENTINEL_CAMERA_SRC", 0)
+    else:
+        camera_source = target_camera_index
         
     try:
         # If it's a numeric string or digit-like, convert to int
@@ -101,17 +122,32 @@ def execute_loop_tick(cap, state, target_camera_index=0):
                     cap.release()
                 cap = None
             
-            log(f"Opening camera source {camera_source}...", "INFO")
-            cap_obj = cv2.VideoCapture(camera_source)
-            if cap_obj.isOpened():
-                cap = cap_obj
-                active_camera_index = camera_source
-                response = {"type": "status", "camera": "opened", "camera_index": target_camera_index}
-            else:
-                log(f"Failed to open camera source {camera_source}. Falling back to mock camera.", "WARNING")
+            log(f"Opening camera source {camera_source} in a background thread...", "INFO")
+            result_dict = {"cap": None, "success": False, "timed_out": False}
+            t = threading.Thread(
+                target=_try_open_camera,
+                args=(camera_source, result_dict),
+                daemon=True
+            )
+            t.start()
+            t.join(timeout=2.0)
+            
+            if t.is_alive():
+                result_dict["timed_out"] = True
+                log(f"Opening camera source {camera_source} timed out after 2.0s. Falling back to mock camera.", "WARNING")
                 cap = MockVideoCapture(camera_source)
                 active_camera_index = camera_source
                 response = {"type": "status", "camera": "opened", "camera_index": target_camera_index}
+            else:
+                if result_dict["success"]:
+                    cap = result_dict["cap"]
+                    active_camera_index = camera_source
+                    response = {"type": "status", "camera": "opened", "camera_index": target_camera_index}
+                else:
+                    log(f"Failed to open camera source {camera_source}. Falling back to mock camera.", "WARNING")
+                    cap = MockVideoCapture(camera_source)
+                    active_camera_index = camera_source
+                    response = {"type": "status", "camera": "opened", "camera_index": target_camera_index}
     else:  # state == "BREAK"
         if cap is not None:
             log("Entering BREAK mode. Releasing camera...", "INFO")
@@ -142,6 +178,7 @@ def main():
     
     log("Main loop started.", "INFO")
     cap = None
+    detector = None
     try:
         while True:
             with state_lock:
@@ -154,21 +191,32 @@ def main():
                 send_response(status_response)
             
             if state == "FOCUS":
-                # Try reading a frame from camera if active (to pump connection)
+                # Lazy-load YOLO detector when entering FOCUS mode
+                if detector is None:
+                    log("Loading YOLO26 Nano detector...", "INFO")
+                    model_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "yolo26n.pt")
+                    # Ensure models directory exists
+                    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+                    detector = ObjectDetector(model_path=model_path)
+                
+                phone_detected = False
                 if cap is not None:
                     try:
                         ret, frame = cap.read()
-                        if not ret:
+                        if ret:
+                            # Run real frame inference to detect mobile phone
+                            phone_detected = detector.detect_phone(frame)
+                        else:
                             log("Failed to read frame from active camera", "WARNING")
                     except Exception as e:
-                        log(f"Exception while reading frame: {e}", "WARNING")
+                        log(f"Exception while reading or processing frame: {e}", "WARNING")
                 
-                # Emit telemetry frame to demonstrate active connection
+                # Emit telemetry frame with actual phone detection state
                 telemetry = {
                     "type": "telemetry",
                     "timestamp": time.time(),
                     "data": {
-                        "phone_detected": False
+                        "phone_detected": phone_detected
                     }
                 }
                 send_response(telemetry)

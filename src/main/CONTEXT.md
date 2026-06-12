@@ -13,6 +13,7 @@ The bridge communicates with Python using standard I/O (stdio) streams with Newl
   * Establishes event listeners on `stdout` (telemetry parsing) and `stderr` (log capture).
 * **`sendCommand(action: string, data?: Record<string, any>): void`**
   * Serializes `{ action, ...data }` to a JSON line and writes it to Python's `stdin` (terminated by `\n`).
+  * Supported actions include `ping`, `change_state` (transitioning the vision loop between `FOCUS` and `BREAK`), and `change_camera` (e.g. `{ index: 1 }` to swap camera indexes in real time).
 * **`stop(): void`**
   * Sends an `{ action: "exit" }` shutdown payload to Python.
   * Starts a 2-second timeout. If the child process does not close within the window, it executes `child.kill('SIGKILL')`.
@@ -60,6 +61,11 @@ sequenceDiagram
     Bridge->>Python: stdin: {"action": "ping"}\n
     Python-->>Bridge: stdout: {"type": "pong"}\n
     Bridge-->>Electron Main: emit 'message' (pong)
+
+    Electron Main->>Bridge: sendCommand("change_camera", { index: 1 })
+    Bridge->>Python: stdin: {"action": "change_camera", "index": 1}\n
+    Python-->>Bridge: stdout: {"type": "status", "camera": "opened", "camera_index": 1}\n
+    Bridge-->>Electron Main: emit 'message' (status)
 
     Electron Main->>Bridge: stop()
     Bridge->>Python: stdin: {"action": "exit"}\n
