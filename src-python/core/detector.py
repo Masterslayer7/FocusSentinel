@@ -36,6 +36,7 @@ class ObjectDetector:
         # Run inference in silent mode with the specified input resolution
         results = self.model(frame, imgsz=self.imgsz, verbose=False)
         
+        # r represents a frame in the video feed
         for r in results:
             if r.boxes is not None:
                 # Retrieve class IDs and confidence values as standard Python lists
