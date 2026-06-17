@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import * as path from 'path';
+import * as fs from 'fs';
 
 export class PythonBridge extends EventEmitter {
   private childProcess: ChildProcess | null = null;
@@ -10,9 +11,29 @@ export class PythonBridge extends EventEmitter {
 
   constructor(pythonPath: string = 'python3', scriptPath?: string) {
     super();
-    this.pythonPath = pythonPath;
-    // By default, assume script is in src-python relative to project root.
-    // When compiled to dist/main/pythonBridge.js, '../../src-python/main.py' goes up to root.
+    
+    // Resolve project root from compiled directory (dist/main/pythonBridge.js -> ../..)
+    const rootDir = path.resolve(__dirname, '../..');
+    const venvDir = path.join(rootDir, '.venv');
+    
+    let resolvedPython = pythonPath;
+    if (pythonPath === 'python3' || pythonPath === 'python') {
+      if (fs.existsSync(venvDir)) {
+        if (process.platform === 'win32') {
+          const winPython = path.join(venvDir, 'Scripts', 'python.exe');
+          if (fs.existsSync(winPython)) {
+            resolvedPython = winPython;
+          }
+        } else {
+          const unixPython = path.join(venvDir, 'bin', 'python');
+          if (fs.existsSync(unixPython)) {
+            resolvedPython = unixPython;
+          }
+        }
+      }
+    }
+    
+    this.pythonPath = resolvedPython;
     this.scriptPath = scriptPath || path.resolve(__dirname, '../../src-python/main.py');
   }
 

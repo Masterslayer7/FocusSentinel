@@ -15,8 +15,9 @@ The application relies on a multi-process architecture to separate the frontend 
 
 ### 2. Computer Vision Pipeline (Python)
 * **Language:** Python
-* **Libraries:** OpenCV (frame capture), YOLO26 Nano (lightweight object detection for `cell_phone`).
-* **Role:** Runs in the background, executes inference on frame streams, and immediately drops the matrix frames from memory. Emits telemetry (e.g., `phone_detected` and coordinate box metadata) to `stdout`.
+* **Libraries:** OpenCV (frame capture), Ultralytics YOLO (lightweight object detection using `yolo26n.pt`).
+* **Role:** Runs in the background, executes inference on frame streams using the `ObjectDetector` class, and immediately drops the matrix frames from memory to preserve absolute privacy. Emits telemetry (e.g., `phone_detected`) to `stdout`.
+* **Robust Fail-Safe:** If a selected hardware camera stream fails to open or is busy, the pipeline falls back to a `MockVideoCapture` source. This prevents blocking loops and infinite hangs (which are common on headless/WSL environments).
 
 ### 3. Evaluator Engine (Local AI)
 * **LLM Engine:** `node-llama-cpp` running a quantized local model (e.g., Llama 3 8B or Phi-3 Mini) via the Node.js Main Process.
@@ -25,7 +26,7 @@ The application relies on a multi-process architecture to separate the frontend 
 
 ## System States (Pomodoro Master Controller)
 The behavior of all processes depends on the active timer state:
-* **STATE_FOCUS:** Vision pipeline actively scans the video frames for phone presence. The LLM evaluator reacts if a phone is detected.
+* **STATE_FOCUS:** Vision pipeline actively scans the video frames for phone presence (COCO class ID `67`). The LLM evaluator reacts if a phone is detected.
 * **STATE_BREAK:** Vision pipeline is suspended (camera released, CPU usage drops to 0%). The LLM evaluator is relaxed and encourages hydration/stretching.
 
 ## Strict Engineering Constraints & Rules for AI Assistants
@@ -40,7 +41,7 @@ When generating or modifying code for this project, you MUST adhere strictly to 
 2. **Network Isolation:**
    * Default to 100% local operation. Do not use `fetch` or `axios` to call OpenAI, Anthropic, or external TTS APIs unless explicitly modifying the "Opt-In Cloud Settings" module.
    * Do not spin up Flask, FastAPI, or Express servers to communicate between Python and Node.js. Communication MUST be handled via `child_process.spawn` and `stdin`/`stdout` JSON streams.
-   * *Developer Stream Override:* Developers using WSL2 who cannot directly bind hardware USB cameras can stream their Windows webcam locally and set the `FOCUS_SENTINEL_CAMERA_SRC` environment variable (e.g., `http://localhost:5000/video_feed`) to feed it into the pipeline.
+   * *Developer Stream Override:* Developers using WSL2 who cannot directly bind hardware USB cameras can stream their Windows webcam locally and set the `FOCUS_SENTINEL_CAMERA_SRC` environment variable (e.g., `http://localhost:5000/video_feed`) to feed it into the pipeline. To allow camera switching tests to function, this override is only applied when the default camera index `0` is requested; explicit selection of other indices (like `1`) bypasses the environment override.
 
 3. **Performance & Throttling:**
    * The Python pipeline must run efficiently. Ensure proper `sys.stdout.flush()` usage so Node.js receives events without buffering delays.
