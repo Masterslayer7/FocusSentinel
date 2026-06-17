@@ -14,7 +14,7 @@ current_state = "BREAK"
 current_camera_index = 0
 active_camera_index = 0
 current_threshold = 0.75
-current_model_name = "yolo11l.pt"
+current_model_name = "yolo26l.pt"
 current_imgsz = 640
 
 

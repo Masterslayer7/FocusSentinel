@@ -24,7 +24,7 @@ export default function App() {
   const [cameraIndex, setCameraIndex] = useState(0);
   const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
   const [threshold, setThreshold] = useState(0.75);
-  const [model, setModel] = useState('yolo11l.pt');
+  const [model, setModel] = useState('yolo26l.pt');
   const [imgsz, setImgsz] = useState(640);
 
   // Query and prompt camera devices permission on mount

@@ -13,9 +13,9 @@ def main():
     print("  - Use the Trackbar at the top to adjust threshold.")
     print("  - Press 'n' to switch to YOLO Nano (yolo26n.pt).")
     print("  - Press 's' to switch to YOLO Small (yolo26s.pt).")
-    print("  - Press 'm' to switch to YOLO Medium (yolo11m.pt).")
-    print("  - Press 'l' to switch to YOLO Large (yolo11l.pt).")
-    print("  - Press 'x' to switch to YOLO Extra Large (yolo11x.pt).")
+    print("  - Press 'm' to switch to YOLO Medium (yolo26m.pt).")
+    print("  - Press 'l' to switch to YOLO Large (yolo26l.pt).")
+    print("  - Press 'x' to switch to YOLO Extra Large (yolo26x.pt).")
     print("  - Press '1' to set vision range to 640px (Standard).")
     print("  - Press '2' to set vision range to 960px (Extended).")
     print("  - Press '3' to set vision range to 1280px (Maximum).")
@@ -47,7 +47,7 @@ def main():
         sys.exit(1)
 
     # 4. Initialize detector with default Large model
-    model_name = "yolo11l.pt"
+    model_name = "yolo26l.pt"
     model_path = resolve_model_path(model_name)
     print(f"Loading detector weights: {model_path}...")
     detector = ObjectDetector(model_path=model_path, threshold=0.75)
@@ -144,21 +144,21 @@ def main():
                 detector._model_name = small_model
             elif key == ord('m'):
                 # Switch to YOLO Medium
-                med_model = "yolo11m.pt"
+                med_model = "yolo26m.pt"
                 med_path = resolve_model_path(med_model)
                 print(f"Loading YOLO Medium weights: {med_path}...")
                 detector.set_model(med_path)
                 detector._model_name = med_model
             elif key == ord('l'):
                 # Switch to YOLO Large
-                large_model = "yolo11l.pt"
+                large_model = "yolo26l.pt"
                 large_path = resolve_model_path(large_model)
                 print(f"Loading YOLO Large weights: {large_path}...")
                 detector.set_model(large_path)
                 detector._model_name = large_model
             elif key == ord('x'):
                 # Switch to YOLO Extra Large
-                xl_model = "yolo11x.pt"
+                xl_model = "yolo26x.pt"
                 xl_path = resolve_model_path(xl_model)
                 print(f"Loading YOLO Extra Large weights: {xl_path}...")
                 detector.set_model(xl_path)

@@ -124,7 +124,7 @@ describe('FocusSentinel App React UI', () => {
     render(<App />);
     const select = await screen.findByLabelText('Vision Model Weights') as HTMLSelectElement;
     expect(select).toBeDefined();
-    expect(select.value).toBe('yolo11l.pt'); // Default value
+    expect(select.value).toBe('yolo26l.pt'); // Default value
 
     await act(async () => {
       fireEvent.change(select, { target: { value: 'yolo26s.pt' } });

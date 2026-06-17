@@ -107,9 +107,9 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
             >
               <option value="yolo26n.pt">YOLO Nano (Low CPU)</option>
               <option value="yolo26s.pt">YOLO Small (Medium CPU)</option>
-              <option value="yolo11m.pt">YOLO Medium (High Accuracy)</option>
-              <option value="yolo11l.pt">YOLO Large (Very High Accuracy)</option>
-              <option value="yolo11x.pt">YOLO X-Large (Max Accuracy)</option>
+              <option value="yolo26m.pt">YOLO Medium (High Accuracy)</option>
+              <option value="yolo26l.pt">YOLO Large (Very High Accuracy)</option>
+              <option value="yolo26x.pt">YOLO X-Large (Max Accuracy)</option>
             </select>
           </div>
 

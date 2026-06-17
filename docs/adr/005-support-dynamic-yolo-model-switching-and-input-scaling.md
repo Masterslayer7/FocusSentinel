@@ -2,7 +2,7 @@
 
 Date: 2026-06-12
 
-Status: Accepted
+Status: Superseded by ADR-006
 
 Context:
 Our baseline YOLO26 Nano model (`yolo26n.pt`) running at `640x640` resolution has proven to be highly performant but lacks the spatial resolution and capacity to accurately detect cell phones at further distances. When a camera is positioned far away, a phone occupies a tiny region of the frame; downsampling it to 640px causes the model to output low confidence scores (false negatives) or misclassify similar hand-held items (such as Rubik's cubes) as cell phones (false positives). We need a way to increase detection precision, support different hardware capabilities, and allow users to calibrate their systems to different physical layouts.

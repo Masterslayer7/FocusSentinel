@@ -6,7 +6,7 @@ class ObjectDetector:
     ObjectDetector wrapper using Ultralytics YOLO to scan video frame matrices
     specifically for target distraction objects (such as cell phones).
     """
-    def __init__(self, model_path="yolo11l.pt", threshold=0.75, imgsz=640):
+    def __init__(self, model_path="yolo26l.pt", threshold=0.75, imgsz=640):
         # Initialize YOLO. This downloads model weights to model_path if not found
         self.model = YOLO(model_path)
         self.threshold = threshold
