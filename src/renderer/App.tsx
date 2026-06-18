@@ -106,6 +106,19 @@ export default function App() {
     window.api.sendCommand('ping');
   };
 
+  const handleVerifyWebGPU = async () => {
+    appendSystemLog("Initiating WebGPU LLM validation...");
+    try {
+      const { runWebGPUVerification } = await import('./services/test-webgpu-llm');
+      await runWebGPUVerification(
+        (msg) => appendSystemLog(`[LLM Diagnostic] ${msg}`),
+        (progress) => appendSystemLog(`[LLM Progress] Download at ${progress}%`)
+      );
+    } catch (err: any) {
+      appendSystemLog(`[LLM Diagnostic ERROR] Verification failed: ${err?.message || err}`);
+    }
+  };
+
   const handleToggleFocus = (checked: boolean) => {
     setFocusMode(checked);
     
@@ -170,6 +183,7 @@ export default function App() {
           onModelChange={handleModelChange}
           imgsz={imgsz}
           onImgszChange={handleImgszChange}
+          onVerifyWebGPU={handleVerifyWebGPU}
         />
 
         <TelemetryDisplay
