@@ -29,7 +29,6 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://127.0.0.1:5173').catch(() => {});
-    mainWindow.webContents.openDevTools();
     mainWindow.webContents.on('did-fail-load', () => {
       setTimeout(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
