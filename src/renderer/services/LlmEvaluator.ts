@@ -1,4 +1,7 @@
-import { CreateMLCEngine, type EngineInterface, hasModelInCache, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
+import { CreateMLCEngine, type MLCEngineInterface, hasModelInCache, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
+import { LlmPreset, EvaluatorContext, buildPrompt, trimTrailingIncompleteSentence } from "./PromptBuilder";
+
+export { LlmPreset, EvaluatorContext };
 
 export type LlmState = 'uninitialized' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error';
 
@@ -16,7 +19,7 @@ export class LlmEvaluator {
   private currentProgress = 0;
   private currentMessage = '';
 
-  private engine: EngineInterface | null = null;
+  private engine: MLCEngineInterface | null = null;
   private currentModelId: string | null = null;
 
   /**
@@ -62,7 +65,7 @@ export class LlmEvaluator {
   /**
    * Updates the internal service status and notifies all registered listeners.
    */
-  public updateStatus(state: LlmState, progress = 0, message = ''): void {
+  private updateStatus(state: LlmState, progress = 0, message = ''): void {
     this.currentState = state;
     this.currentProgress = progress;
     this.currentMessage = message;
@@ -172,16 +175,35 @@ export class LlmEvaluator {
   }
 
   /**
-   * Placeholder text generation method stub (implemented in Step 2.4/2.5).
+   * Text generation method. Compiles prompts from the preset and context, 
+   * invokes the local WebGPU model, and yields the trimmed spoken response.
    */
-  public async evaluate(prompt: string): Promise<string> {
+  public async evaluate(preset: LlmPreset, context: EvaluatorContext): Promise<string> {
     if (!this.engine) {
       throw new Error("Cannot evaluate: WebGPU engine is not initialized.");
     }
-    this.updateStatus('generating', 100, `Evaluating prompt: ${prompt}`);
-    const mockResponse = `Stub response to: ${prompt}`;
+    this.updateStatus('generating', 100, `Generating reprimand using preset: ${preset}...`);
+
+    const { systemPrompt, userPrompt } = buildPrompt(preset, context);
+
+    // During Phase 2 Step 2.4 and 2.5, we will return a structured stub that includes
+    // the system and user prompts to verify correctness in tests and UI console logs.
+    const mockReply = `[Stub] [System: ${preset}] [User: ${userPrompt.replace(/\n/g, ' ')}]`;
+    
+    // In Step 2.5/2.6 this will be replaced with:
+    // const response = await this.engine.chat.completions.create({
+    //   messages: [
+    //     { role: 'system', content: systemPrompt },
+    //     { role: 'user', content: userPrompt }
+    //   ],
+    //   temperature: 0.7,
+    //   max_tokens: 80
+    // });
+    // const reply = response.choices[0].message.content || '';
+
+    const reply = trimTrailingIncompleteSentence(mockReply);
     this.updateStatus('ready', 100, 'Evaluation complete');
-    return mockResponse;
+    return reply;
   }
 
   /**
