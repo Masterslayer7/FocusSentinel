@@ -109,7 +109,7 @@ export default function App() {
   const handleVerifyWebGPU = async () => {
     appendSystemLog("Initiating WebGPU LLM validation...");
     try {
-      const { runWebGPUVerification } = await import('./services/test-webgpu-llm');
+      const { runWebGPUVerification } = await import('./services/llm/test-webgpu-llm');
       await runWebGPUVerification(
         (msg) => appendSystemLog(`[LLM Diagnostic] ${msg}`),
         (progress) => appendSystemLog(`[LLM Progress] Download at ${progress}%`)
