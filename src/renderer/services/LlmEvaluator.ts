@@ -22,6 +22,12 @@ export class LlmEvaluator {
   private engine: MLCEngineInterface | null = null;
   private currentModelId: string | null = null;
 
+  // Time-based thresholds and state trackers
+  private lastSpeechTime = 0;                    // timestamp in milliseconds
+  private readonly speechCooldown = 120000;       // in milliseconds (2 minutes)
+  private readonly minDistractionDuration = 5;    // in seconds
+  private isAborted = false;
+
   /**
    * Retrieves the current state of the LLM service.
    */
@@ -177,39 +183,70 @@ export class LlmEvaluator {
   /**
    * Text generation method. Compiles prompts from the preset and context, 
    * invokes the local WebGPU model, and yields the trimmed spoken response.
+   * Includes debounce, cooldown, and abort handling logic.
    */
   public async evaluate(preset: LlmPreset, context: EvaluatorContext): Promise<string> {
     if (!this.engine) {
       throw new Error("Cannot evaluate: WebGPU engine is not initialized.");
     }
+
+    // Debounce Guard: verify distraction duration threshold
+    if (context.distractionDuration < this.minDistractionDuration) {
+      this.updateStatus('ready', 100, `Evaluation skipped: distraction duration (${context.distractionDuration}s) below 5s`);
+      return '';
+    }
+
+    // Cooldown Guard: verify time since last speech
+    const now = Date.now();
+    if (now - this.lastSpeechTime < this.speechCooldown) {
+      this.updateStatus('ready', 100, 'Evaluation skipped: cooldown active');
+      return '';
+    }
+
+    // Reset Abort Status
+    this.isAborted = false;
     this.updateStatus('generating', 100, `Generating reprimand using preset: ${preset}...`);
 
-    const { systemPrompt, userPrompt } = buildPrompt(preset, context);
+    try {
+      const { systemPrompt, userPrompt } = buildPrompt(preset, context);
 
-    // During Phase 2 Step 2.4 and 2.5, we will return a structured stub that includes
-    // the system and user prompts to verify correctness in tests and UI console logs.
-    const mockReply = `[Stub] [System: ${preset}] [User: ${userPrompt.replace(/\n/g, ' ')}]`;
-    
-    // In Step 2.5/2.6 this will be replaced with:
-    // const response = await this.engine.chat.completions.create({
-    //   messages: [
-    //     { role: 'system', content: systemPrompt },
-    //     { role: 'user', content: userPrompt }
-    //   ],
-    //   temperature: 0.7,
-    //   max_tokens: 80
-    // });
-    // const reply = response.choices[0].message.content || '';
+      // During Phase 2 Step 2.4 and 2.5, we will return a structured stub that includes
+      // the system and user prompts to verify correctness in tests and UI console logs.
+      const mockReply = `[Stub] [System: ${preset}] [User: ${userPrompt.replace(/\n/g, ' ')}]`;
+      
+      // Simulate async delay to allow testing cancellation/abort mid-generation
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
-    const reply = trimTrailingIncompleteSentence(mockReply);
-    this.updateStatus('ready', 100, 'Evaluation complete');
-    return reply;
+      // Abort Check post-completion (or post-mock)
+      if (this.isAborted) {
+        throw new Error("Evaluation aborted");
+      }
+
+      const reply = trimTrailingIncompleteSentence(mockReply);
+      this.lastSpeechTime = Date.now(); // Record success timestamp
+      this.updateStatus('ready', 100, 'Evaluation complete');
+      return reply;
+    } catch (err: any) {
+      // If aborted, update status accordingly, otherwise transition to error
+      if (this.isAborted) {
+        this.updateStatus('ready', 100, 'Generation aborted by user action');
+      } else {
+        this.updateStatus('error', 0, `Failed to generate response: ${err?.message || err}`);
+      }
+      throw err;
+    }
   }
 
   /**
-   * Placeholder cancellation method stub (implemented in Step 2.5/2.6).
+   * Cancels active text generation immediately and signals the WebGPU engine to stop.
    */
   public cancel(): void {
+    this.isAborted = true;
+    if (this.engine) {
+      this.engine.interruptGenerate().catch((err) => {
+        console.error('[LlmEvaluator] Error interrupting WebLLM generation:', err);
+      });
+    }
     this.updateStatus('ready', 100, 'Active generation request cancelled');
   }
 }

@@ -2,12 +2,14 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 
 // Define mocks for the web-llm engine
 const mockUnload = vi.fn().mockResolvedValue(undefined);
+const mockInterruptGenerate = vi.fn().mockResolvedValue(undefined);
 const mockChatCreate = vi.fn().mockResolvedValue({
   choices: [{ message: { content: 'Focus' } }]
 });
 
 const mockEngine = {
   unload: mockUnload,
+  interruptGenerate: mockInterruptGenerate,
   chat: {
     completions: {
       create: mockChatCreate
@@ -45,13 +47,21 @@ describe('LlmEvaluator Pub/Sub Service', () => {
     // Reset llm status state to default before each test using public API first
     await llmEvaluator.unloadModel();
 
+    // Reset singleton private fields to default to ensure test isolation
+    llmEvaluator['lastSpeechTime'] = 0;
+    llmEvaluator['isAborted'] = false;
+
     // Reset call histories AFTER reset so we start clean
     mockUnload.mockClear();
+    mockInterruptGenerate.mockClear();
     mockChatCreate.mockClear();
     mockCachesDelete.mockClear();
     mockCachesKeys.mockClear();
     mockHasModelInCache.mockClear();
     mockDeleteModelAllInfoInCache.mockClear();
+
+    // Restore real timers in case any test leaves fake timers enabled
+    vi.useRealTimers();
 
     // Stub global browser caches object
     vi.stubGlobal('caches', {
@@ -269,6 +279,77 @@ describe('LlmEvaluator Pub/Sub Service', () => {
       
       llmEvaluator.cancel();
       expect(llmEvaluator.getState()).toBe('ready');
+    });
+
+    test('should skip evaluation and return empty string if distraction duration is less than 5 seconds (debounce)', async () => {
+      await llmEvaluator.initialize('test-model-id');
+
+      const context: EvaluatorContext = {
+        violationCount: 1,
+        distractionDuration: 4, // Below 5s threshold
+        timeRemaining: 1200,
+        activeSessionGoal: 'Revise PRD'
+      };
+
+      const result = await llmEvaluator.evaluate('Disappointed Parent', context);
+      
+      expect(result).toBe('');
+      expect(llmEvaluator.getMessage()).toContain('Evaluation skipped: distraction duration');
+    });
+
+    test('should enforce cooldown threshold between evaluations', async () => {
+      let mockNow = 1700000000000;
+      const dateNowSpy = vi.spyOn(Date, 'now').mockImplementation(() => mockNow);
+      
+      await llmEvaluator.initialize('test-model-id');
+
+      const context: EvaluatorContext = {
+        violationCount: 1,
+        distractionDuration: 8,
+        timeRemaining: 1200,
+        activeSessionGoal: 'Revise PRD'
+      };
+
+      // First call succeeds
+      const result1 = await llmEvaluator.evaluate('Disappointed Parent', context);
+      expect(result1).toContain('[Stub]');
+
+      // Second call within 2 minutes (e.g. 30 seconds later) fails/skips
+      mockNow += 30000;
+      const result2 = await llmEvaluator.evaluate('Disappointed Parent', context);
+      expect(result2).toBe('');
+      expect(llmEvaluator.getMessage()).toContain('Evaluation skipped: cooldown active');
+
+      // Third call after more than 2 minutes (e.g. 91 seconds later, total 121 seconds) succeeds
+      mockNow += 91000;
+      const result3 = await llmEvaluator.evaluate('Disappointed Parent', context);
+      expect(result3).toContain('[Stub]');
+
+      dateNowSpy.mockRestore();
+    });
+
+    test('should support aborting generation mid-process', async () => {
+      await llmEvaluator.initialize('test-model-id');
+
+      const context: EvaluatorContext = {
+        violationCount: 1,
+        distractionDuration: 8,
+        timeRemaining: 1200,
+        activeSessionGoal: 'Revise PRD'
+      };
+
+      // Initiate evaluation
+      const evalPromise = llmEvaluator.evaluate('Disappointed Parent', context);
+
+      // Cancel immediately in the next microtask/tick
+      llmEvaluator.cancel();
+
+      // Assert that it throws 'Evaluation aborted'
+      await expect(evalPromise).rejects.toThrow('Evaluation aborted');
+
+      // State should return to ready, and interruptGenerate should be called on the engine
+      expect(llmEvaluator.getState()).toBe('ready');
+      expect(mockInterruptGenerate).toHaveBeenCalledTimes(1);
     });
   });
 });
