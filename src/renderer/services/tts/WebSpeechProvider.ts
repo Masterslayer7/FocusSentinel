@@ -33,7 +33,6 @@ export class WebSpeechProvider implements ITtsProvider {
           id: voice.name,
           name: voice.name,
           provider: 'webspeech',
-          isPremium: false,
         }));
 
         resolve(mappedVoices);

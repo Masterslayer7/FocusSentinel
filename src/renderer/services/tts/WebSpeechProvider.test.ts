@@ -66,7 +66,6 @@ describe('WebSpeechProvider', () => {
       id: 'Alex',
       name: 'Alex',
       provider: 'webspeech',
-      isPremium: false,
     });
     expect(voices[1].name).toBe('Daniel');
   });

@@ -1,25 +1,23 @@
 # Core Computer Vision Module Context
 
-This module contains the core computer vision detection and evaluation algorithms. It captures frames from local camera feeds, runs inference on the frame stream to detect targeted objects, and immediately drops raw frames from memory to maintain absolute user privacy.
+This module contains the core computer vision detection and evaluation algorithms. It captures frames from local camera feeds, runs inference on the frame stream to detect targeted distraction objects, and immediately drops raw frames from memory to maintain absolute user privacy.
 
 ---
 
-## Core Interfaces
+## 1. Directory Manifest & Boundaries
 
-### 1. `ObjectDetector` Class
-* **Purpose:** Employs a lightweight YOLO model (`yolo26n.pt` downloaded to models directory) via Ultralytics to detect physical distraction objects (specifically mobile phones) in video frame matrices.
-* **Public Methods:**
-  * `detect_phone(frame) -> bool`: Processes an OpenCV frame matrix and returns `True` if a cell phone (COCO class ID `67`) is detected with confidence higher than the threshold (default: 0.45).
-
-### 2. Camera Management (State Machine in `main.py`)
-* **Purpose:** Manages the active hardware camera stream, coordinates state-dependent capture, and fallbacks cleanly.
-* **Key Components:**
-  * `execute_loop_tick(cap, state, target_camera_index)`: Checks for state shifts or camera index changes. Safely releases old cameras and spawns the new index.
-  * `MockVideoCapture`: A robust dummy fallback stream that initializes when camera devices are unavailable, preventing infinite blocking and test hangs.
+*   **Directory Manifest:**
+    *   `detector.py`: Contains the `ObjectDetector` class which wraps YOLO models to analyze camera frames for physical distraction objects (e.g., mobile phones).
+*   **Integration Boundaries:**
+    *   **OpenCV API:** Captures hardware video stream frame matrices.
+    *   **Ultralytics YOLO:** Integrates with the `ultralytics` framework to perform deep-learning-based object detection.
 
 ---
 
-## Pipeline Execution & Throttling Flow
+## 2. Architecture & Flow
+
+### Pipeline Execution & Throttling Flow
+The state diagram below maps how the computer vision loop activates and sleeps based on the desktop timer states, minimizing CPU usage during breaks:
 
 ```mermaid
 stateDiagram-v2
@@ -41,7 +39,34 @@ stateDiagram-v2
     }
 ```
 
-## Dependencies
-* **OpenCV (opencv-python)** (hardware video stream capture)
-* **Ultralytics YOLO** (object detection framework)
+---
 
+## 3. Public Interfaces & Contracts
+
+### `ObjectDetector` Class
+
+#### `__init__(model_path="yolo26l.pt", threshold=0.75, imgsz=640)`
+*   **Input:**
+    *   `model_path: str` (Path to YOLO model weight file; downloads automatically if missing)
+    *   `threshold: float` (Confidence cutoff value, defaults to `0.75`)
+    *   `imgsz: int` (Image size used for inference scaling, defaults to `640`)
+
+#### `set_threshold(threshold)`
+*   **Input:** `threshold: float`
+*   **Output:** `None`
+*   **Description:** Updates the active confidence threshold (0.0 to 1.0) for detecting target objects.
+
+#### `set_model(model_path)`
+*   **Input:** `model_path: str`
+*   **Output:** `None`
+*   **Description:** Atomically swaps the active YOLO model weights.
+
+#### `set_imgsz(imgsz)`
+*   **Input:** `imgsz: int`
+*   **Output:** `None`
+*   **Description:** Updates the frame matrix scaling dimensions used for inference.
+
+#### `detect_phone(frame)`
+*   **Input:** `frame: any` (OpenCV BGR frame matrix)
+*   **Output:** `bool`
+*   **Description:** Performs detection scanning on the input frame. Returns `True` if a cell phone device (COCO class ID `67`) is detected with confidence higher than the threshold; `false` otherwise. Returns `false` immediately if the frame is `None`.

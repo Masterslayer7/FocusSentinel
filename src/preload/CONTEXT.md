@@ -1,35 +1,20 @@
 # Preload Module Context
 
-The preload script acts as a secure gateway, exposing isolated Electron IPC channels from the Main process to the Renderer process in a type-safe manner without exposing full Node.js API privileges.
-
-## Exposed Interfaces (`window.api`)
-
-The main world context exposes a single `api` object on the global `window`:
-
-### `window.api.onTelemetry(callback: (data: any) => void): () => void`
-* **Purpose:** Registers a subscription function to receive real-time telemetry updates broadcast from the Python subprocess via the Main process.
-* **Arguments:** 
-  * `callback`: Function called when a telemetry packet arrives.
-* **Returns:** An unsubscribe function (`() => void`) that detaches the listener. This must be invoked upon UI component unmounting to prevent memory leaks.
-
-### `window.api.sendCommand(action: string, data?: Record<string, any>): void`
-* **Purpose:** Relays a control payload (such as state changes or diagnostics) from the Renderer UI down to the Python child process.
-* **Arguments:**
-  * `action`: Command identifier (e.g. `"ping"`, `"change_state"`).
-  * `data`: Optional command metadata.
-
-### `window.api.minimize(): void`
-* **Purpose:** Requests the Main process to minimize the application window.
-
-### `window.api.maximize(): void`
-* **Purpose:** Requests the Main process to toggle the application window's maximized state.
-
-### `window.api.close(): void`
-* **Purpose:** Requests the Main process to close the application window and terminate the CV pipeline child process.
+The preload script acts as a secure, type-safe gateway exposing isolated Electron IPC channels from the Main process to the Renderer process without granting full Node.js API privileges.
 
 ---
 
-## Architecture & Security Boundary
+## 1. Directory Manifest & Boundaries
+
+*   **Directory Manifest:**
+    *   `preload.ts`: Exposes safe Main-process messaging APIs to the global `window.api` namespace.
+*   **Integration Boundaries:**
+    *   **Electron Context Bridge:** Relies on `contextBridge` to expose functions to the UI securely.
+    *   **IPC Communication:** Communicates with the Electron Main process via `ipcRenderer`.
+
+---
+
+## 2. Architecture & Flow
 
 ```mermaid
 graph LR
@@ -41,6 +26,33 @@ graph LR
     style Preload fill:#3b82f6,stroke:#1d4ed8,color:#fff
 ```
 
-## Dependencies
-* Electron `contextBridge`
-* Electron `ipcRenderer`
+---
+
+## 3. Public Interfaces & Contracts
+
+The Main World context exposes the following methods on the global `window.api` object:
+
+### `window.api.onTelemetry(callback)`
+*   **Input:** `callback: (data: any) => void`
+*   **Output:** `() => void` (Unsubscribe function)
+*   **Description:** Subscribes a listener to real-time telemetry updates broadcast from the Python child process. Returns a cleanup function that detaches the listener.
+
+### `window.api.sendCommand(action, data)`
+*   **Input:** `action: string`, `data?: Record<string, any>`
+*   **Output:** `void`
+*   **Description:** Sends a command payload from the UI to the Python child process via IPC.
+
+### `window.api.minimize()`
+*   **Input:** None
+*   **Output:** `void`
+*   **Description:** Requests the main process to minimize the application window.
+
+### `window.api.maximize()`
+*   **Input:** None
+*   **Output:** `void`
+*   **Description:** Requests the main process to maximize/restore the application window.
+
+### `window.api.close()`
+*   **Input:** None
+*   **Output:** `void`
+*   **Description:** Requests the main process to close the application window and terminate subprocesses.
