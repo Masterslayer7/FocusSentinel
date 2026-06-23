@@ -1,7 +1,7 @@
 // All voices, regardless of where they come from, will look like this to the UI
 export interface TtsVoice {
-  id: string;          // e.g., "en-US-JennyNeural" or "openai-alloy"
-  name: string;        // e.g., "Microsoft Jenny" or "OpenAI Alloy"
+  id: string;
+  name: string;       
   provider: 'webspeech' | 'cloud' | 'piper';
   isPremium: boolean;
 }
