@@ -1,0 +1,186 @@
+diff --git a/package.json b/package.json
+index f8a6291..93605c8 100644
+--- a/package.json
++++ b/package.json
+@@ -6,7 +6,7 @@
+   "scripts": {
+     "build": "tsc && vite build",
+     "watch": "tsc -w",
+-    "dev": "tsc && concurrently -k \"vite\" \"ELECTRON_IS_DEV=1 electron .\"",
++    "dev": "tsc && concurrently -k \"vite\" \"cross-env ELECTRON_IS_DEV=1 electron .\"",
+     "start": "npm run build && electron .",
+     "test:ui": "vitest run"
+   },
+@@ -18,6 +18,7 @@
+     "@types/react-dom": "^19.2.3",
+     "@vitejs/plugin-react": "^6.0.2",
+     "concurrently": "^10.0.3",
++    "cross-env": "^10.1.0",
+     "electron": "^30.0.0",
+     "jsdom": "^29.1.1",
+     "ts-node": "^10.9.2",
+@@ -26,6 +27,7 @@
+     "vitest": "^4.1.8"
+   },
+   "dependencies": {
++    "@mlc-ai/web-llm": "^0.2.84",
+     "react": "^19.2.7",
+     "react-dom": "^19.2.7"
+   }
+diff --git a/src/main/main.ts b/src/main/main.ts
+index 0f262ce..da74428 100644
+--- a/src/main/main.ts
++++ b/src/main/main.ts
+@@ -2,10 +2,15 @@ import { app, BrowserWindow, ipcMain } from 'electron';
+ import * as path from 'path';
+ import { PythonBridge } from './pythonBridge';
+ 
+-// Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments without context failures
++// Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments or over network shares without context failures
+ app.commandLine.appendSwitch('disable-gpu-sandbox');
+ app.commandLine.appendSwitch('ignore-gpu-blocklist');
+ 
++if (process.platform === 'linux') {
++  app.commandLine.appendSwitch('enable-unsafe-webgpu');
++  app.commandLine.appendSwitch('enable-features', 'Vulkan');
++}
++
+ const isDev = process.env.ELECTRON_IS_DEV === '1';
+ let mainWindow: BrowserWindow | null = null;
+ let pythonBridge: PythonBridge | null = null;
+@@ -24,6 +29,7 @@ function createWindow() {
+ 
+   if (isDev) {
+     mainWindow.loadURL('http://127.0.0.1:5173').catch(() => {});
++    mainWindow.webContents.openDevTools();
+     mainWindow.webContents.on('did-fail-load', () => {
+       setTimeout(() => {
+         if (mainWindow && !mainWindow.isDestroyed()) {
+diff --git a/src/main/pythonBridge.ts b/src/main/pythonBridge.ts
+index d1ca282..525ebaa 100644
+--- a/src/main/pythonBridge.ts
++++ b/src/main/pythonBridge.ts
+@@ -15,17 +15,19 @@ export class PythonBridge extends EventEmitter {
+     // Resolve project root from compiled directory (dist/main/pythonBridge.js -> ../..)
+     const rootDir = path.resolve(__dirname, '../..');
+     const venvDir = path.join(rootDir, '.venv');
++    const venvWinDir = path.join(rootDir, '.venv-win');
+     
+     let resolvedPython = pythonPath;
+     if (pythonPath === 'python3' || pythonPath === 'python') {
+-      if (fs.existsSync(venvDir)) {
++      const targetVenv = (process.platform === 'win32' && fs.existsSync(venvWinDir)) ? venvWinDir : venvDir;
++      if (fs.existsSync(targetVenv)) {
+         if (process.platform === 'win32') {
+-          const winPython = path.join(venvDir, 'Scripts', 'python.exe');
++          const winPython = path.join(targetVenv, 'Scripts', 'python.exe');
+           if (fs.existsSync(winPython)) {
+             resolvedPython = winPython;
+           }
+         } else {
+-          const unixPython = path.join(venvDir, 'bin', 'python');
++          const unixPython = path.join(targetVenv, 'bin', 'python');
+           if (fs.existsSync(unixPython)) {
+             resolvedPython = unixPython;
+           }
+diff --git a/src/renderer/App.tsx b/src/renderer/App.tsx
+index 6509b4d..a52b3c9 100644
+--- a/src/renderer/App.tsx
++++ b/src/renderer/App.tsx
+@@ -106,6 +106,19 @@ export default function App() {
+     window.api.sendCommand('ping');
+   };
+ 
++  const handleVerifyWebGPU = async () => {
++    appendSystemLog("Initiating WebGPU LLM validation...");
++    try {
++      const { runWebGPUVerification } = await import('./services/test-webgpu-llm');
++      await runWebGPUVerification(
++        (msg) => appendSystemLog(`[LLM Diagnostic] ${msg}`),
++        (progress) => appendSystemLog(`[LLM Progress] Download at ${progress}%`)
++      );
++    } catch (err: any) {
++      appendSystemLog(`[LLM Diagnostic ERROR] Verification failed: ${err?.message || err}`);
++    }
++  };
++
+   const handleToggleFocus = (checked: boolean) => {
+     setFocusMode(checked);
+     
+@@ -170,6 +183,7 @@ export default function App() {
+           onModelChange={handleModelChange}
+           imgsz={imgsz}
+           onImgszChange={handleImgszChange}
++          onVerifyWebGPU={handleVerifyWebGPU}
+         />
+ 
+         <TelemetryDisplay
+diff --git a/src/renderer/components/ControlBoard.tsx b/src/renderer/components/ControlBoard.tsx
+index c40eef5..fbaa2af 100644
+--- a/src/renderer/components/ControlBoard.tsx
++++ b/src/renderer/components/ControlBoard.tsx
+@@ -13,6 +13,7 @@ interface ControlBoardProps {
+   onModelChange: (val: string) => void;
+   imgsz: number;
+   onImgszChange: (val: number) => void;
++  onVerifyWebGPU?: () => void;
+ }
+ 
+ export const ControlBoard: React.FC<ControlBoardProps> = ({
+@@ -28,6 +29,7 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
+   onModelChange,
+   imgsz,
+   onImgszChange,
++  onVerifyWebGPU,
+ }) => {
+   return (
+     <section className="card control-card">
+@@ -40,6 +42,11 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
+         <button id="btn-ping" className="btn btn-primary" onClick={onPing}>
+           <span className="btn-icon">⚡</span> Send Ping Command
+         </button>
++        {onVerifyWebGPU && (
++          <button id="btn-verify-webgpu" className="btn btn-secondary" onClick={onVerifyWebGPU}>
++            <span className="btn-icon">⚙️</span> Verify WebGPU LLM
++          </button>
++        )}
+         
+         <div className="switch-container">
+           <div className="switch-text">
+diff --git a/src/renderer/index.css b/src/renderer/index.css
+index 27fe039..f3b2320 100644
+--- a/src/renderer/index.css
++++ b/src/renderer/index.css
+@@ -295,6 +295,18 @@ body {
+   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);
+ }
+ 
++.btn-secondary {
++  background: rgba(255, 255, 255, 0.05);
++  border: 1px solid rgba(255, 255, 255, 0.1);
++  color: #94a3b8;
++}
++
++.btn-secondary:hover {
++  background: rgba(255, 255, 255, 0.1);
++  color: white;
++  transform: translateY(-2px);
++}
++
+ .btn:active {
+   transform: translateY(0);
+ }
+diff --git a/vite.config.ts b/vite.config.ts
+index 0e76617..412da2b 100644
+--- a/vite.config.ts
++++ b/vite.config.ts
+@@ -14,6 +14,9 @@ export default defineConfig({
+     host: '127.0.0.1',
+     port: 5173,
+     strictPort: true,
++    watch: {
++      usePolling: true,
++    },
+   },
+   test: {
+     globals: true,

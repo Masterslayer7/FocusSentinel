@@ -15,17 +15,19 @@ export class PythonBridge extends EventEmitter {
     // Resolve project root from compiled directory (dist/main/pythonBridge.js -> ../..)
     const rootDir = path.resolve(__dirname, '../..');
     const venvDir = path.join(rootDir, '.venv');
+    const venvWinDir = path.join(rootDir, '.venv-win');
     
     let resolvedPython = pythonPath;
     if (pythonPath === 'python3' || pythonPath === 'python') {
-      if (fs.existsSync(venvDir)) {
+      const targetVenv = (process.platform === 'win32' && fs.existsSync(venvWinDir)) ? venvWinDir : venvDir;
+      if (fs.existsSync(targetVenv)) {
         if (process.platform === 'win32') {
-          const winPython = path.join(venvDir, 'Scripts', 'python.exe');
+          const winPython = path.join(targetVenv, 'Scripts', 'python.exe');
           if (fs.existsSync(winPython)) {
             resolvedPython = winPython;
           }
         } else {
-          const unixPython = path.join(venvDir, 'bin', 'python');
+          const unixPython = path.join(targetVenv, 'bin', 'python');
           if (fs.existsSync(unixPython)) {
             resolvedPython = unixPython;
           }

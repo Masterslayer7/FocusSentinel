@@ -9,6 +9,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .venv/
+.venv-win/
+venv-win/
 venv/
 ENV/
 src-python/models/

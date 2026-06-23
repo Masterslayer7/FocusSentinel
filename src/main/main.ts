@@ -2,9 +2,14 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { PythonBridge } from './pythonBridge';
 
-// Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments without context failures
+// Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments or over network shares without context failures
 app.commandLine.appendSwitch('disable-gpu-sandbox');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
+
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('enable-unsafe-webgpu');
+  app.commandLine.appendSwitch('enable-features', 'Vulkan');
+}
 
 const isDev = process.env.ELECTRON_IS_DEV === '1';
 let mainWindow: BrowserWindow | null = null;

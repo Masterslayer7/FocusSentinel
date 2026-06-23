@@ -13,6 +13,7 @@ interface ControlBoardProps {
   onModelChange: (val: string) => void;
   imgsz: number;
   onImgszChange: (val: number) => void;
+  onVerifyWebGPU?: () => void;
 }
 
 export const ControlBoard: React.FC<ControlBoardProps> = ({
@@ -28,6 +29,7 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
   onModelChange,
   imgsz,
   onImgszChange,
+  onVerifyWebGPU,
 }) => {
   return (
     <section className="card control-card">
@@ -40,6 +42,11 @@ export const ControlBoard: React.FC<ControlBoardProps> = ({
         <button id="btn-ping" className="btn btn-primary" onClick={onPing}>
           <span className="btn-icon">⚡</span> Send Ping Command
         </button>
+        {onVerifyWebGPU && (
+          <button id="btn-verify-webgpu" className="btn btn-secondary" onClick={onVerifyWebGPU}>
+            <span className="btn-icon">⚙️</span> Verify WebGPU LLM
+          </button>
+        )}
         
         <div className="switch-container">
           <div className="switch-text">
