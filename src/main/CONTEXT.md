@@ -90,4 +90,4 @@ The main process intercepts the following message events from the renderer proce
 *   **`'window-minimize'`**: Minimizes the desktop application window.
 *   **`'window-maximize'`**: Toggles maximized/restored desktop window frame state.
 *   **`'window-close'`**: Closes the application frame and terminates the Python subprocess.
-*   **`'send-to-python'`**: Expects `{ action: string, data: any }` and forwards the payload to `pythonBridge.sendCommand`.
+*   **`'send-to-python'`**: Expects `{ action: string, data: any }` and forwards the payload to `pythonBridge.sendCommand`. 
