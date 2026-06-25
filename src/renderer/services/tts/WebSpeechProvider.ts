@@ -78,7 +78,7 @@ export class WebSpeechProvider implements ITtsProvider {
 
     const synth = window.speechSynthesis;
 
-    // Cancel any ongoing speech to start clean
+    // Cancel any ongoing speech to start clean 
     synth.cancel();
 
     return new Promise<void>((resolve, reject) => {
