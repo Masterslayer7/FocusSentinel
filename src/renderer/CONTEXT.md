@@ -2,34 +2,59 @@
 
 This module manages the user interface (UI) rendering and user interactions within the Electron window using React, Vite, and TypeScript.
 
-> The app is currently a minimal shell. The camera/vision UI (`ControlBoard`, `TelemetryDisplay`) and the licensing UI (`PremiumGuard`, `PremiumUpsellBanner`) were removed as part of the pivot away from camera-based detection and monetization — see `docs/adr/008-retire-camera-pipeline-and-licensing.md`. The next increments (goal input, a new distraction signal, and wiring the LLM/TTS services into it) will rebuild this section.
+---
 
-## Component Architecture
+## 1. Directory Manifest & Boundaries
 
-1. **`App.tsx`**: The parent controller component. Currently renders just the `Header` and an empty `<main>` placeholder.
-2. **`Header.tsx`**: Renders the app logo header, a static status badge, and Electron window control actions (minimize, maximize, close).
-3. **`LogConsole.tsx`**: Encapsulates a scrollable log display (`#log-body`) with a clear-logs button and auto-scroll-to-bottom. Currently unused pending the next feature increment.
+*   **Directory Manifest:**
+    *   `App.tsx`: Root component. Currently a minimal shell — renders `Header` and an empty `<main>` placeholder.
+    *   `components/Header.tsx`: App logo, a static status badge, and window-control buttons (minimize, maximize, close).
+    *   `components/LogConsole.tsx`: Scrollable, auto-scrolling log display with a clear-logs button. Not currently mounted by `App.tsx` — retained for the next feature increment to wire up.
+    *   `App.test.tsx`: Smoke test suite (Vitest + React Testing Library, JSDOM environment).
+    *   `setupTests.ts`: Global `window.api` mocks for the test environment.
+*   **Integration Boundaries:**
+    *   **Preload Context Bridge:** Calls `window.api.minimize/maximize/close`, exposed by [preload/preload.ts](file:///home/yugp/projects/FocusSentinel/src/preload/preload.ts) (see [preload/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/preload/CONTEXT.md)).
+    *   **Local Services:** `services/llm/` and `services/tts/` exist as standalone, tested modules (see their own `CONTEXT.md` files) but are **not yet wired into `App.tsx`** — that integration is the next planned increment, not part of the current shell.
+
+> The camera/vision UI (`ControlBoard`, `TelemetryDisplay`) and the licensing UI (`PremiumGuard`, `PremiumUpsellBanner`) were removed as part of the pivot away from camera-based detection and monetization — see `docs/adr/008-retire-camera-pipeline-and-licensing.md`.
 
 ---
 
-## Inter-Process Communication & Render Flow
+## 2. Architecture & Flow
 
 ```mermaid
 graph TD
-    User[User Click] -->|React Event Handler| Header[Header.tsx]
+    User[User Clicks Window Control] -->|onClick handler| Header[Header.tsx]
     Header -->|window.api.minimize/maximize/close| Preload[Preload API Gateway]
+    Preload -->|ipcRenderer.send| Main[Electron Main Process]
+
+    LLM[services/llm/LlmEvaluator] -.not yet wired.-> App[App.tsx]
+    TTS[services/tts/WebSpeechProvider] -.not yet wired.-> App
 ```
 
 ---
 
-## Testing
+## 3. Public Interfaces & Contracts
 
-* **`App.test.tsx`**: Smoke test written in Vitest and React Testing Library (JSDOM environment) — confirms the header renders and window-control buttons call `window.api`.
-* **`setupTests.ts`**: Sets up global mock interfaces (`window.api.minimize/maximize/close`) for the Electron preload bridge in testing environments.
+### Component: `App` (default export)
+*   **Props:** None.
+*   **Description:** Renders `Header` wired to `window.api`, plus an empty `<main className="app-main">` placeholder where the goal input, distraction signal, and LLM/TTS integration will land.
+
+### Component: `Header`
+| Prop | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `onMinimize` | `() => void` | Yes | Called when the minimize button is clicked. |
+| `onMaximize` | `() => void` | Yes | Called when the maximize/restore button is clicked. |
+| `onClose` | `() => void` | Yes | Called when the close button is clicked. |
+
+### Component: `LogConsole`
+| Prop | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `streamLogs` | `string[]` | Yes | Log lines to render. Each entry may be prefixed `typeClass|message` for styling; entries without a `|` render as plain text. |
+| `onClearLogs` | `() => void` | Yes | Called when the "Clear Logs" button is clicked. |
 
 ---
 
-## Dependencies
-* Bundler & Dev Server: [vite.config.ts](file:///home/yugp/projects/FocusSentinel/vite.config.ts)
-* Styling system: [index.css](file:///home/yugp/projects/FocusSentinel/src/renderer/index.css)
-* Preload context bridge: [preload.ts](file:///home/yugp/projects/FocusSentinel/src/preload/preload.ts)
+## 4. Testing
+* **`App.test.tsx`**: Confirms the header renders and that its window-control buttons call `window.api.minimize/maximize/close`.
+* **`setupTests.ts`**: Stubs `window.api` with `vi.fn()` mocks for `minimize`, `maximize`, and `close`.
