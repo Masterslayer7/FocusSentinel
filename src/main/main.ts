@@ -1,6 +1,5 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
-import { PythonBridge } from './pythonBridge';
 
 // Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments or over network shares without context failures
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -13,7 +12,6 @@ if (process.platform === 'linux') {
 
 const isDev = process.env.ELECTRON_IS_DEV === '1';
 let mainWindow: BrowserWindow | null = null;
-let pythonBridge: PythonBridge | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -48,20 +46,6 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
 
-  // Initialize and start the Python CV standard I/O bridge
-  pythonBridge = new PythonBridge();
-  
-  pythonBridge.on('message', (payload) => {
-    console.log('[Electron Main] Stdio message parsed:', payload);
-    
-    // Relay the telemetry down to the renderer UI
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('python-telemetry', payload);
-    }
-  });
-
-  pythonBridge.start();
-
   // IPC listeners for custom window controls
   ipcMain.on('window-minimize', () => {
     mainWindow?.minimize();
@@ -81,13 +65,6 @@ app.whenReady().then(() => {
     mainWindow?.close();
   });
 
-  // IPC listener for renderer commands
-  ipcMain.on('send-to-python', (_event, command) => {
-    if (pythonBridge) {
-      pythonBridge.sendCommand(command.action, command.data || {});
-    }
-  });
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -101,9 +78,3 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('will-quit', () => {
-  // Ensure the child process is torn down when quitting the app
-  if (pythonBridge) {
-    pythonBridge.stop();
-  }
-});
