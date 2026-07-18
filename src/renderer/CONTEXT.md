@@ -1,18 +1,14 @@
 # Renderer UI Context
 
-This module manages the user interface (UI) rendering and user interactions within the Electron window using React, Vite, and TypeScript. It binds state parameters, coordinates IPC commands via the preload context bridge, and updates components based on incoming telemetry.
+This module manages the user interface (UI) rendering and user interactions within the Electron window using React, Vite, and TypeScript.
+
+> The app is currently a minimal shell. The camera/vision UI (`ControlBoard`, `TelemetryDisplay`) and the licensing UI (`PremiumGuard`, `PremiumUpsellBanner`) were removed as part of the pivot away from camera-based detection and monetization — see `docs/adr/008-retire-camera-pipeline-and-licensing.md`. The next increments (goal input, a new distraction signal, and wiring the LLM/TTS services into it) will rebuild this section.
 
 ## Component Architecture
 
-The UI is structured into modular functional components under `src/renderer/components/`:
-
-1. **`App.tsx`**: The parent controller component. It manages state hooks (`focusMode`, `cameraStatus`, `phoneDetected`, `streamLogs`), handles the telemetry channel subscription setup, and maps callback events down to specific views.
-2. **`Header.tsx`**: Renders the app logo header, the pulsing connection/camera status badge (`#status-badge`), and Electron window window control actions (minimize, maximize, close).
-3. **`ControlBoard.tsx`**: Manages user actions for standard input control:
-   - **Ping Command (`#btn-ping`)**: Issues a `"ping"` action down the IPC channel.
-   - **Focus Switch (`#focus-switch`)**: Toggles the overall Pomodoro focus state, triggering `{ action: "change_state", state: "FOCUS" | "BREAK" }` to start/stop the camera capture pipeline.
-4. **`TelemetryDisplay.tsx`**: Renders standard output telemetry metrics (e.g. Yaw, Pitch, Phone Detection state alerts) and embeds the log console.
-5. **`LogConsole.tsx`**: Encapsulates raw packet console log displays (`#log-body`) and provides a button to clear logs. It features a self-contained automatic scroll-to-bottom effect when logs are updated.
+1. **`App.tsx`**: The parent controller component. Currently renders just the `Header` and an empty `<main>` placeholder.
+2. **`Header.tsx`**: Renders the app logo header, a static status badge, and Electron window control actions (minimize, maximize, close).
+3. **`LogConsole.tsx`**: Encapsulates a scrollable log display (`#log-body`) with a clear-logs button and auto-scroll-to-bottom. Currently unused pending the next feature increment.
 
 ---
 
@@ -20,20 +16,16 @@ The UI is structured into modular functional components under `src/renderer/comp
 
 ```mermaid
 graph TD
-    User[User Click/Toggle] -->|React Event Handler| Comp[Subcomponent]
-    Comp -->|Callback Trigger| App[App.tsx]
-    App -->|window.api.sendCommand| Preload[Preload API Gateway]
-    
-    Preload -->|onTelemetry callback| App
-    App -->|React State Update| Comp
+    User[User Click] -->|React Event Handler| Header[Header.tsx]
+    Header -->|window.api.minimize/maximize/close| Preload[Preload API Gateway]
 ```
 
 ---
 
 ## Testing
 
-* **`App.test.tsx`**: UI test suite written in Vitest and React Testing Library (under a JSDOM environment). It uses a mock `window.api` telemetry callback loop to verify component rendering, state transitions, warning triggers, and mock IPC transmissions.
-* **`setupTests.ts`**: Sets up global mock interfaces for the Electron preload bridge in testing environments.
+* **`App.test.tsx`**: Smoke test written in Vitest and React Testing Library (JSDOM environment) — confirms the header renders and window-control buttons call `window.api`.
+* **`setupTests.ts`**: Sets up global mock interfaces (`window.api.minimize/maximize/close`) for the Electron preload bridge in testing environments.
 
 ---
 

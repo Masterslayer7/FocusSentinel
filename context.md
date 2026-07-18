@@ -1,52 +1,37 @@
 # Project Context: FocusSentinel
 
 ## Overview
-FocusSentinel is a privacy-first, local-only desktop application designed to act as a strict digital study evaluator. It uses real-time computer vision to monitor physical distraction events (specifically focusing on mobile phone usage) and leverages a local Large Language Model (LLM) and Text-to-Speech (TTS) to deliver verbal reprimands or encouragement based on an integrated Pomodoro state machine. 
+FocusSentinel is a personal, local-only desktop tool built to help its one user (the developer) stay focused during work sessions. It watches for distraction signals, and uses a local Large Language Model (LLM) and Text-to-Speech (TTS) to offer supportive, motivating check-ins tied to the user's own stated goals for the session.
 
-**Core Philosophy:** Zero data retention. Air-gapped privacy by default. Authoritative but helpful persona. Minimally intrusive.
+**Core Philosophy:** Built for personal use, not as a product for others. Success is measured by whether it actually helps its one user, not by feature breadth or polish. Local-only and zero-data-retention because that's the simplest, lowest-friction way to build this for oneself — not because it needs to earn a stranger's trust.
 
-## Architecture & Tech Stack
-The application relies on a multi-process architecture to separate the frontend UI from the heavy computer vision pipeline, communicating strictly via Standard I/O (stdio) to avoid network/port exposure.
+> Earlier direction (superseded): this project originally used webcam-based phone detection (YOLO/OpenCV) with a licensing/tiers system aimed at a wider audience. That direction caused scope creep and burnout, and has been retired. See `docs/adr/008-retire-camera-pipeline-and-licensing.md`.
 
-### 1. Frontend & Orchestrator (Node.js + Electron)
-* **Language:** TypeScript
-* **Framework:** Electron (Main Process) + React/HTML/CSS (Render Process)
-* **Role:** Manages the UI, controls the Pomodoro state machine, and acts as the master process. It spawns the Python vision pipeline as a child process and listens to its `stdout` for JSON telemetry packets.
+## Where things stand
+- **Electron + React shell**: window management, custom title bar — working.
+- **Local LLM evaluator** (`src/renderer/services/llm/`): WebGPU-based local inference via `@mlc-ai/web-llm`, decoupled prompt building (see ADR-007). Reusable for the next phase; the existing personas need reframing toward supportive/motivational guidance rather than punitive reprimands.
+- **TTS** (`src/renderer/services/tts/`): `WebSpeechProvider` implemented and tested.
+- **Camera/YOLO detection pipeline**: removed.
+- **Licensing/tiers**: removed. No monetization plan.
 
-### 2. Computer Vision Pipeline (Python)
-* **Language:** Python
-* **Libraries:** OpenCV (frame capture), Ultralytics YOLO (lightweight object detection using `yolo26n.pt`).
-* **Role:** Runs in the background, executes inference on frame streams using the `ObjectDetector` class, and immediately drops the matrix frames from memory to preserve absolute privacy. Emits telemetry (e.g., `phone_detected`) to `stdout`.
-* **Robust Fail-Safe:** If a selected hardware camera stream fails to open or is busy, the pipeline falls back to a `MockVideoCapture` source. This prevents blocking loops and infinite hangs (which are common on headless/WSL environments).
+## What's next (not yet built)
+- A "goal" input so the user can state what they're working on and why, giving the LLM evaluator real context to be supportive rather than generic.
+- Distraction signal(s) that better match how this user actually gets distracted while working at a computer — most likely desktop/active-window usage tracking — rather than a webcam pointed at a phone.
+- Wiring the LLM evaluator and TTS into that signal end-to-end, so the core hypothesis (does a supportive AI check-in actually help) can be tested for real.
 
-### 3. Evaluator Engine (Local AI)
-* **LLM Engine:** `node-llama-cpp` running a quantized local model (e.g., Llama 3 8B or Phi-3 Mini) via the Node.js Main Process.
-* **TTS Engine:** Piper TTS (local, offline) or Web Speech API.
-* **Role:** Receives trigger events from the vision pipeline, generates contextual responses based on the current Pomodoro state, and speaks to the user.
+## Engineering Constraints & Rules for AI Assistants
 
-## System States (Pomodoro Master Controller)
-The behavior of all processes depends on the active timer state:
-* **STATE_FOCUS:** Vision pipeline actively scans the video frames for phone presence (COCO class ID `67`). The LLM evaluator reacts if a phone is detected.
-* **STATE_BREAK:** Vision pipeline is suspended (camera released, CPU usage drops to 0%). The LLM evaluator is relaxed and encourages hydration/stretching.
+1. **Zero-Data Retention:**
+   * Never persist screen contents, audio, or other personal activity data to disk. Keep everything in memory for the duration of a session.
+   * No external telemetry, crash reporting, or analytics.
 
-## Strict Engineering Constraints & Rules for AI Assistants
+2. **Local-First:**
+   * No cloud LLM/TTS calls (OpenAI, Anthropic, etc.) unless the user explicitly asks for a cloud-backed option later.
+   * Don't stand up local HTTP servers (Flask/Express/etc.) for communication between processes unless there's a real need for it — prefer direct in-process calls or Electron's own IPC.
 
-When generating or modifying code for this project, you MUST adhere strictly to the following rules:
+3. **Code Quality:**
+   * Strict TypeScript typing for IPC payloads and service interfaces.
+   * Keep services decoupled and single-purpose (see `LlmEvaluator`/`PromptBuilder` split in ADR-007).
 
-1. **Absolute Privacy (Zero-Data Retention):**
-   * Never write code that saves video frames, image matrices, or audio logs to the disk. 
-   * Volatile memory only. Once vectors are extracted, the OpenCV frame must be destroyed.
-   * Do not implement external telemetry, crash reporting, or cloud analytics.
-
-2. **Network Isolation:**
-   * Default to 100% local operation. Do not use `fetch` or `axios` to call OpenAI, Anthropic, or external TTS APIs unless explicitly modifying the "Opt-In Cloud Settings" module.
-   * Do not spin up Flask, FastAPI, or Express servers to communicate between Python and Node.js. Communication MUST be handled via `child_process.spawn` and `stdin`/`stdout` JSON streams.
-   * *Developer Stream Override:* Developers using WSL2 who cannot directly bind hardware USB cameras can stream their Windows webcam locally and set the `FOCUS_SENTINEL_CAMERA_SRC` environment variable (e.g., `http://localhost:5000/video_feed`) to feed it into the pipeline. To allow camera switching tests to function, this override is only applied when the default camera index `0` is requested; explicit selection of other indices (like `1`) bypasses the environment override.
-
-3. **Performance & Throttling:**
-   * The Python pipeline must run efficiently. Ensure proper `sys.stdout.flush()` usage so Node.js receives events without buffering delays.
-   * Implement debouncing on the Node.js side so the LLM evaluator is not spammed by rapid consecutive vision triggers.
-
-4. **Code Quality:**
-   * Use strict TypeScript typing for all IPC (Inter-Process Communication) payloads.
-   * Keep Python modules decoupled (e.g., separate classes for `ObjectDetector` and `StreamManager`).
+4. **Process:**
+   * This project is being rebuilt deliberately, in small, explained, reviewed increments — not batch-generated. Don't propose or execute large multi-file autonomous changes; work one reviewable step at a time.
