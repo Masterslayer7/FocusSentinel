@@ -1,11 +1,8 @@
-import { PremiumFeature } from '../license/LicenseManager';
-
 // All voices, regardless of where they come from, will look like this to the UI
 export interface TtsVoice {
   id: string;
-  name: string;       
+  name: string;
   provider: 'webspeech' | 'cloud' | 'piper';
-  requiredFeature?: PremiumFeature;
 }
 
 export interface ITtsProvider {
