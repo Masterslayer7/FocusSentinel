@@ -31,14 +31,14 @@ The old stdout rule ("Python CV pipeline logs go to stderr, stdout is telemetry-
 
 ## Writing Style
 
-These six rules govern every piece of prose this project produces: docs, commit messages, ADRs, PR text, chat replies. Check your prose against them before you send it.
+These guide the prose this project produces: docs, commit messages, ADRs, PR text, chat replies. The goal is direct and clear, not clipped or bare — a full explanation is welcome; padding isn't.
 
-1. Never use a metaphor, simile, or figure of speech you're used to seeing in print.
-2. Never use a long word where a short one will do.
-3. If you can cut a word, cut it.
-4. Never use the passive where you can use the active.
-5. Never use a foreign phrase, a scientific word, or jargon if an everyday word will do.
-6. Break any of these rules sooner than say something outright barbarous.
+1. Skip the stock metaphor you've seen in print a hundred times — but a fresh one that actually clarifies something is welcome, not banned.
+2. Prefer the plain word to the inflated one, without cutting a sentence down past what it needs to read well.
+3. Cut words that pad a sentence out; keep words that earn their place, even if that makes the explanation longer.
+4. Prefer the active voice; use the passive when it's genuinely the clearer choice.
+5. Skip jargon or a foreign phrase when an everyday word says the same thing — but use the precise technical term when it's the correct one.
+6. Break any of these the moment following them would make something awkward or unclear. Clarity wins.
 
 ---
 
