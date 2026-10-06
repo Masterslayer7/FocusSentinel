@@ -18,7 +18,7 @@ describe('focus → LlmEvaluator plumbing', () => {
     const evaluator = new LlmEvaluator();
     await evaluator.initialize('fake-model');
 
-    const tracker = new FocusTracker({ allowedApps: ['Code'], browsers: [], allowedBrowserTitles: [] });
+    const tracker = new FocusTracker({ apps: { Code: 'focus' }, allowedBrowserTitles: [] });
     const at = (appName: string, seconds: number) =>
       tracker.accept({ appName, windowTitle: '', timestamp: 1_700_000_000_000 + seconds * 1000 });
 

@@ -1,10 +1,15 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { FocusTracker } from './FocusTracker';
+import { FocusTracker, classifyApp } from './FocusTracker';
 import type { FocusRules } from './types';
 
 const RULES: FocusRules = {
-  allowedApps: ['Code', 'Windows Terminal'],
-  browsers: ['zen', 'chrome', 'msedge'],
+  apps: {
+    Code: 'focus',
+    'Windows Terminal': 'focus',
+    zen: 'browser',
+    chrome: 'browser',
+    msedge: 'browser',
+  },
   allowedBrowserTitles: ['MDN', 'Stack Overflow', 'localhost'],
 };
 
@@ -104,6 +109,39 @@ describe('FocusTracker', () => {
     });
   });
 
+  describe('rules can change and focus blocks can end', () => {
+    test('new rules take effect from the next sample', () => {
+      tracker.accept(sample('Discord', 'general', 0));
+      tracker.setRules({ ...RULES, apps: { ...RULES.apps, Discord: 'focus' } });
+
+      expect(tracker.accept(sample('Discord', 'general', 4)).isDistracted).toBe(false);
+    });
+
+    test('interrupt ends the current episode without touching the count', () => {
+      tracker.accept(sample('Discord', 'general', 0));
+      tracker.accept(sample('Discord', 'general', 10));
+
+      tracker.interrupt();
+
+      expect(tracker.getStatus()).toEqual({
+        isDistracted: false,
+        distractionDuration: 0,
+        violationCount: 1,
+        currentApp: 'Discord',
+      });
+    });
+
+    test('a distraction after an interrupt is a new episode, timed from its own start', () => {
+      tracker.accept(sample('Discord', 'general', 0));
+      tracker.interrupt(); // e.g. the focus block ended and a break ran
+      tracker.accept(sample('Discord', 'general', 300));
+      const status = tracker.accept(sample('Discord', 'general', 304));
+
+      expect(status.violationCount).toBe(2);
+      expect(status.distractionDuration).toBe(4);
+    });
+  });
+
   describe('browsers are judged on window title', () => {
     test('a browser showing an allowed title is not a distraction', () => {
       const status = tracker.accept(sample('zen', 'MDN Web Docs — Array', 0));
@@ -131,5 +169,34 @@ describe('FocusTracker', () => {
 
       expect(status.isDistracted).toBe(true);
     });
+  });
+});
+
+describe('classifyApp', () => {
+  const rules: FocusRules = {
+    apps: { Chrome: 'browser', 'Google Chrome': 'focus', Code: 'focus', Discord: 'distraction' },
+    allowedBrowserTitles: [],
+  };
+
+  test('an exact name match wins over a partial one', () => {
+    expect(classifyApp('Google Chrome', rules)).toBe('focus');
+  });
+
+  test('a partial match applies when there is no exact one', () => {
+    expect(classifyApp('Chrome Canary', rules)).toBe('browser');
+    expect(classifyApp('Visual Studio Code', rules)).toBe('focus');
+  });
+
+  test('matching ignores case', () => {
+    expect(classifyApp('DISCORD', rules)).toBe('distraction');
+  });
+
+  test('an app that matches nothing is a distraction', () => {
+    expect(classifyApp('Spotify', rules)).toBe('distraction');
+  });
+
+  test('the longest partial match wins, so results do not depend on key order', () => {
+    const nested: FocusRules = { apps: { Code: 'distraction', 'Studio Code': 'focus' }, allowedBrowserTitles: [] };
+    expect(classifyApp('Visual Studio Code', nested)).toBe('focus');
   });
 });

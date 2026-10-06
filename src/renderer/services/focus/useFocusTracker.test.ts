@@ -4,8 +4,7 @@ import { useFocusTracker } from './useFocusTracker';
 import type { FocusRules, SamplerEvent } from './types';
 
 const RULES: FocusRules = {
-  allowedApps: ['Code'],
-  browsers: ['chrome'],
+  apps: { Code: 'focus', chrome: 'browser' },
   allowedBrowserTitles: ['MDN'],
 };
 

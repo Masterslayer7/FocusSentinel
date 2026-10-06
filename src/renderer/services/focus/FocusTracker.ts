@@ -1,4 +1,24 @@
-import type { FocusRules, FocusStatus, WindowSample } from './types';
+import type { AppCategory, FocusRules, FocusStatus, WindowSample } from './types';
+
+/**
+ * How the rules classify an app: an exact (case-insensitive) name match wins,
+ * then the longest rule key contained in the name, else 'distraction'.
+ */
+export const classifyApp = (appName: string, rules: FocusRules): AppCategory => {
+  const name = appName.toLowerCase();
+  let partial: { key: string; category: AppCategory } | null = null;
+
+  for (const [key, category] of Object.entries(rules.apps)) {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === name) {
+      return category;
+    }
+    if (lowerKey && name.includes(lowerKey) && (!partial || lowerKey.length > partial.key.length)) {
+      partial = { key: lowerKey, category };
+    }
+  }
+  return partial?.category ?? 'distraction';
+};
 
 const matchesAny = (haystack: string, needles: string[]): boolean => {
   const value = haystack.toLowerCase();
@@ -12,7 +32,12 @@ export class FocusTracker {
   private distractionDuration = 0;
   private currentApp = '';
 
-  constructor(private readonly rules: FocusRules) {}
+  constructor(private rules: FocusRules) {}
+
+  /** Replaces the rules; they apply from the next sample. */
+  public setRules(rules: FocusRules): void {
+    this.rules = rules;
+  }
 
   /** Feeds one observation in and returns the resulting status. */
   public accept(sample: WindowSample): FocusStatus {
@@ -47,6 +72,16 @@ export class FocusTracker {
     };
   }
 
+  /**
+   * Ends the current distraction episode without counting or timing anything,
+   * e.g. when a focus block ends. A later distraction starts a new episode.
+   */
+  public interrupt(): void {
+    this.isDistracted = false;
+    this.distractionStart = null;
+    this.distractionDuration = 0;
+  }
+
   public reset(): void {
     this.isDistracted = false;
     this.violationCount = 0;
@@ -57,9 +92,10 @@ export class FocusTracker {
 
   /** Browsers are judged on window title, because the tab is the activity; everything else on app name. */
   private isAllowed(sample: WindowSample): boolean {
-    if (matchesAny(sample.appName, this.rules.browsers)) {
+    const category = classifyApp(sample.appName, this.rules);
+    if (category === 'browser') {
       return matchesAny(sample.windowTitle, this.rules.allowedBrowserTitles);
     }
-    return matchesAny(sample.appName, this.rules.allowedApps);
+    return category === 'focus';
   }
 }

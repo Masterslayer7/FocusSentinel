@@ -16,6 +16,23 @@ export interface WindowSample {
   timestamp: number; // ms since epoch, supplied by the sampler
 }
 
+/**
+ * How an app counts. 'browser' means the app itself is neutral and its window
+ * title decides, matched against FocusRules.allowedBrowserTitles.
+ */
+export type AppCategory = 'focus' | 'distraction' | 'browser';
+
+/**
+ * The allowlist. Keys are app display names as get-windows reports them
+ * ("Google Chrome"), matched case-insensitively: an exact match wins, then the
+ * longest key contained in the name. Apps matching no key are distractions.
+ * Persisted (ADR-009).
+ */
+export interface FocusRules {
+  apps: Record<string, AppCategory>;
+  allowedBrowserTitles: string[];
+}
+
 /** Why the sampler cannot currently report samples. */
 export interface SamplerError {
   reason: 'addon-unavailable' | 'query-failed';
