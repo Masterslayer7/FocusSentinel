@@ -3,20 +3,28 @@ import type { FocusStatus, SamplerError } from '../services/focus/types';
 
 interface FocusStatusPanelProps {
   status: FocusStatus;
+  isTracking: boolean;
   error: SamplerError | null;
   onReset: () => void;
 }
 
 // Shows the app name only. FocusStatus carries no window title by design, so
 // nothing here can leak one.
-export const FocusStatusPanel: React.FC<FocusStatusPanelProps> = ({ status, error, onReset }) => {
+export const FocusStatusPanel: React.FC<FocusStatusPanelProps> = ({ status, isTracking, error, onReset }) => {
+  const stateLabel = !isTracking ? 'Paused' : status.isDistracted ? 'Distracted' : 'Focused';
+  const stateClass = !isTracking ? 'paused' : status.isDistracted ? 'alert-active' : 'alert-inactive';
+
   return (
     <section className="card">
       <div className="card-header">
         <h2>Focus</h2>
-        <span className="tag tag-live">Live</span>
+        <span className={`tag ${isTracking ? 'tag-live' : ''}`}>{isTracking ? 'Live' : 'Paused'}</span>
       </div>
-      <p className="section-desc">Watches which window has focus, every 2 seconds. Nothing is saved.</p>
+      <p className="section-desc">
+        {isTracking
+          ? 'Checking which window has focus every 2 seconds.'
+          : 'Distractions only count during a running focus block. App time is still recorded.'}
+      </p>
 
       {error && (
         <div className="sampler-error" role="alert">
@@ -27,11 +35,8 @@ export const FocusStatusPanel: React.FC<FocusStatusPanelProps> = ({ status, erro
       <div className="telemetry-grid">
         <div className="metric">
           <span className="metric-label">State</span>
-          <span
-            className={`metric-status ${status.isDistracted ? 'alert-active' : 'alert-inactive'}`}
-            data-testid="focus-state"
-          >
-            {status.isDistracted ? 'Distracted' : 'Focused'}
+          <span className={`metric-status ${stateClass}`} data-testid="focus-state">
+            {stateLabel}
           </span>
         </div>
         <div className="metric">

@@ -28,7 +28,7 @@ describe('useFocusTracker', () => {
   });
 
   test('starts focused with no error, before any sample arrives', () => {
-    const { result } = renderHook(() => useFocusTracker(RULES));
+    const { result } = renderHook(() => useFocusTracker(RULES, true));
 
     expect(result.current.status).toEqual({
       isDistracted: false,
@@ -40,7 +40,7 @@ describe('useFocusTracker', () => {
   });
 
   test('feeds samples through the tracker and exposes the resulting status', () => {
-    const { result } = renderHook(() => useFocusTracker(RULES));
+    const { result } = renderHook(() => useFocusTracker(RULES, true));
 
     act(() => emit(sample('Discord', 0)));
     act(() => emit(sample('Discord', 4)));
@@ -54,7 +54,7 @@ describe('useFocusTracker', () => {
   });
 
   test('a sampler error is surfaced and leaves the last status in place', () => {
-    const { result } = renderHook(() => useFocusTracker(RULES));
+    const { result } = renderHook(() => useFocusTracker(RULES, true));
 
     act(() => emit(sample('Discord', 0)));
     act(() => emit({ kind: 'error', error: { reason: 'addon-unavailable', message: 'no addon' } }));
@@ -64,7 +64,7 @@ describe('useFocusTracker', () => {
   });
 
   test('the next good sample clears a previous error', () => {
-    const { result } = renderHook(() => useFocusTracker(RULES));
+    const { result } = renderHook(() => useFocusTracker(RULES, true));
 
     act(() => emit({ kind: 'error', error: { reason: 'query-failed', message: 'boom' } }));
     act(() => emit(sample('Code', 2)));
@@ -73,7 +73,7 @@ describe('useFocusTracker', () => {
   });
 
   test('reset returns the status to its initial state', () => {
-    const { result } = renderHook(() => useFocusTracker(RULES));
+    const { result } = renderHook(() => useFocusTracker(RULES, true));
 
     act(() => emit(sample('Discord', 0)));
     act(() => result.current.reset());
@@ -83,10 +83,46 @@ describe('useFocusTracker', () => {
   });
 
   test('unsubscribes from focus events on unmount', () => {
-    const { unmount } = renderHook(() => useFocusTracker(RULES));
+    const { unmount } = renderHook(() => useFocusTracker(RULES, true));
 
     unmount();
 
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  test('new rules take effect from the next sample', () => {
+    const { result, rerender } = renderHook(({ rules }) => useFocusTracker(rules, true), {
+      initialProps: { rules: RULES },
+    });
+
+    rerender({ rules: { ...RULES, apps: { ...RULES.apps, Discord: 'focus' } } });
+    act(() => emit(sample('Discord', 0)));
+
+    expect(result.current.status.isDistracted).toBe(false);
+  });
+
+  test('samples are ignored while not tracking (no focus block running)', () => {
+    const { result } = renderHook(() => useFocusTracker(RULES, false));
+
+    act(() => emit(sample('Discord', 0)));
+    act(() => emit(sample('Discord', 10)));
+
+    expect(result.current.isTracking).toBe(false);
+    expect(result.current.status.violationCount).toBe(0);
+    expect(result.current.status.isDistracted).toBe(false);
+  });
+
+  test('stopping tracking ends the current distraction but keeps the count', () => {
+    const { result, rerender } = renderHook(({ tracking }) => useFocusTracker(RULES, tracking), {
+      initialProps: { tracking: true },
+    });
+    act(() => emit(sample('Discord', 0)));
+    act(() => emit(sample('Discord', 10)));
+
+    rerender({ tracking: false });
+
+    expect(result.current.status.isDistracted).toBe(false);
+    expect(result.current.status.distractionDuration).toBe(0);
+    expect(result.current.status.violationCount).toBe(1);
   });
 });

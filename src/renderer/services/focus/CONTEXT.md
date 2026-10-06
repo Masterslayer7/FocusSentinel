@@ -12,10 +12,12 @@ It holds every rule and all the state, but never calls an OS API — samples are
     *   `types.ts`: `FocusStatus` and `FocusRules`, plus a re-export of the shared `WindowSample` so consumers import everything from here.
     *   `FocusTracker.ts`: The state machine and the hybrid allowlist rule. Pure logic — no timers, no `Date.now()`, no OS access.
     *   `FocusTracker.test.ts`: Test suite covering distraction episodes, duration arithmetic, case-insensitive matching, reset, and the browser-title rule.
-    *   `useFocusTracker.ts`: React hook. Subscribes to `window.api.onFocusEvent`, runs each sample through a session-long `FocusTracker` held in a ref, and exposes `{ status, error, reset }`.
+    *   `useFocusTracker.ts`: React hook `useFocusTracker(rules, isTracking)`. Subscribes to `window.api.onFocusEvent`, runs samples through a session-long `FocusTracker` only while `isTracking` (a Pomodoro focus block is running), forwards rule changes via `setRules`, and calls `interrupt()` when tracking stops. Exposes `{ status, error, reset, isTracking }`.
+    *   `AppUsageTracker.ts`: Pure. Credits the time between consecutive samples to the earlier sample's app; gaps over `MAX_CREDITED_GAP_MS` (10s) are not credited.
+    *   `useUsageTracking.ts`: Runs `AppUsageTracker` on every sample (focus block or not) and hands one combined `UsageCredit` per app to a callback every `USAGE_FLUSH_MS` (10s) and on unmount, so usage causes a state change and save every 10s, not every 2s.
     *   `useFocusTracker.test.ts`: Hook tests — subscription, error surfacing, reset, unsubscribe on unmount.
-    *   `rules.ts`: `DEFAULT_RULES`, the in-memory v1 allowlist.
-    *   `useFocusCheckIn.ts`: React hook. Asks an evaluator (`LlmEvaluator` in the app) for one check-in per distraction episode, once the episode reaches `MIN_DISTRACTION_SECONDS`.
+    *   `rules.ts`: `DEFAULT_RULES`, the starting rule map, used until saved rules load. The user's own rules are saved (ADR-009) and edited on the Apps tab.
+    *   `useFocusCheckIn.ts`: React hook `useFocusCheckIn(status, evaluator, session)`. Asks an evaluator for one check-in per distraction episode, once it reaches `MIN_DISTRACTION_SECONDS`, passing the session's persona, unfinished goals and time remaining.
     *   `useFocusCheckIn.test.ts`: Hook tests against a fake evaluator — threshold, once-per-episode, new episodes, skipped/failed outcomes, and session reset.
     *   `checkIn.integration.test.ts`: Real `FocusTracker` → `useFocusCheckIn` → `LlmEvaluator` → `PromptBuilder`, with only the WebGPU engine faked. Proves the real counts reach the prompt.
     *   `rules.test.ts`: Pins the defaults against the app names `get-windows` really reports on Windows.
@@ -25,7 +27,7 @@ It holds every rule and all the state, but never calls an OS API — samples are
 
 > **Wired in.** `WindowSampler` in the main process emits a sample every 2s over `'focus:event'`; `App.tsx` runs `useFocusTracker(DEFAULT_RULES)` and renders the result. `App.tsx` also runs `useFocusCheckIn(status, llmEvaluator)` and logs each check-in; replies are not yet spoken.
 
-> **Privacy.** `windowTitle` is personal activity data (`context.md` constraint 1). The tracker compares it in memory and never stores it; `FocusStatus` deliberately carries the app name only. Do not render, log, or persist titles.
+> **Privacy.** `windowTitle` is compared in memory and never stored, rendered, logged, or saved (ADR-009). `FocusStatus`, `UsageCredit` and the check-in context carry app names only.
 
 ---
 
@@ -100,16 +102,17 @@ interface FocusStatus {
 }
 ```
 
-#### `FocusRules`
+#### `FocusRules` and `AppCategory` (from `src/shared/types.ts`, persisted)
 ```typescript
+type AppCategory = 'focus' | 'distraction' | 'browser';
 interface FocusRules {
-  allowedApps: string[];          // matched against appName, for non-browsers
-  browsers: string[];             // appNames whose windowTitle is judged instead
-  allowedBrowserTitles: string[]; // matched against windowTitle, for browsers only
+  apps: Record<string, AppCategory>; // keyed by app display name
+  allowedBrowserTitles: string[];    // matched against windowTitle, for 'browser' apps only
 }
 ```
 
-All matching is case-insensitive substring matching. That is forgiving in the useful direction (`'Code'` matches `"Visual Studio Code"`) and loose in the other (`'Code'` would also match `"Codecademy"`). For a personal tool tuned by its only user, that trade is accepted.
+#### `classifyApp(appName, rules)` → `AppCategory`
+Case-insensitive. An exact key match wins; otherwise the longest key contained in the name; otherwise `'distraction'`. So a default `Chrome: 'browser'` covers "Google Chrome" until the user sets "Google Chrome" itself on the Apps tab.
 
 ---
 
@@ -117,7 +120,13 @@ All matching is case-insensitive substring matching. That is forgiving in the us
 
 #### `constructor(rules)`
 *   **Input:** `rules: FocusRules`
-*   **Description:** Starts in the focused state with all counters at zero. Rules are fixed for the tracker's lifetime.
+*   **Description:** Starts in the focused state with all counters at zero.
+
+#### `setRules(rules)`
+*   **Description:** Replaces the rules; they apply from the next sample.
+
+#### `interrupt()`
+*   **Description:** Ends the current distraction episode without counting or timing anything (used when a focus block ends). The violation count is kept; a later distraction starts a new episode.
 
 #### `accept(sample)`
 *   **Input:** `sample: WindowSample`
@@ -133,15 +142,15 @@ All matching is case-insensitive substring matching. That is forgiving in the us
 
 ---
 
-### `useFocusTracker(rules)` Hook
-*   **Input:** `rules: FocusRules` — read once, on first render.
-*   **Output:** `{ status: FocusStatus; error: SamplerError | null; reset: () => void }`
-*   **Description:** Subscribes on mount and unsubscribes on unmount. A `sample` event updates `status` and clears `error`; an `error` event sets `error` and leaves the last `status` in place. `reset` is stable across renders.
+### `useFocusTracker(rules, isTracking)` Hook
+*   **Input:** `rules: FocusRules` (changes applied via `setRules`), `isTracking: boolean` (true while a focus block runs).
+*   **Output:** `{ status: FocusStatus; error: SamplerError | null; reset: () => void; isTracking: boolean }`
+*   **Description:** Subscribes on mount and unsubscribes on unmount. While tracking, a `sample` event updates `status`; otherwise samples are ignored and the current episode is interrupted. `error` events are surfaced either way.
 
-### `useFocusCheckIn(status, evaluator)` Hook
-*   **Input:** `status: FocusStatus`, `evaluator: CheckInEvaluator` (`{ evaluate(preset, context): Promise<string> }`)
+### `useFocusCheckIn(status, evaluator, session)` Hook
+*   **Input:** `status: FocusStatus`, `evaluator: CheckInEvaluator` (`{ evaluate(preset, context): Promise<string> }`), `session: CheckInSession` (`{ preset, goals, timeRemainingSeconds }`, read through a ref at fire time)
 *   **Output:** `CheckIn | null` — `{ episode: number; outcome: 'replied' | 'skipped' | 'failed'; text: string }` for the latest attempt.
-*   **Description:** When distracted for at least `MIN_DISTRACTION_SECONDS`, calls `evaluate('Supportive Mentor', context)` once per episode, keyed on `violationCount`. Context carries the real `violationCount`/`distractionDuration` plus labelled placeholders for `timeRemaining` (25 min) and `activeSessionGoal`. An empty reply is `skipped`; a thrown error is `failed` and never propagates. If `violationCount` drops (session reset), episode tracking restarts.
+*   **Description:** When distracted for at least `MIN_DISTRACTION_SECONDS`, calls `evaluate(session.preset, context)` once per episode, keyed on `violationCount`. Context carries the real `violationCount`, `distractionDuration`, `timeRemaining`, unfinished `sessionGoals`, and `distractingApp` (name only). An empty reply is `skipped`; a thrown error is `failed` and never propagates. If `violationCount` drops (session reset), episode tracking restarts.
 *   **Behaviour choice:** "once per episode" means once *attempted*. If an episode's attempt lands in `LlmEvaluator`'s 2-minute cooldown, that episode passes silently, with no retry.
 
 ```mermaid
@@ -153,11 +162,8 @@ stateDiagram-v2
 ```
 
 ### `DEFAULT_RULES`
-```typescript
-{
-  allowedApps: ['Visual Studio Code', 'Windows Terminal', 'Obsidian', 'Electron', 'FocusSentinel'],
-  browsers: ['Chrome', 'Edge', 'Firefox', 'Zen'],
-  allowedBrowserTitles: ['MDN', 'Stack Overflow', 'GitHub', 'localhost'],
-}
-```
-`get-windows` reports **display names** (`Google Chrome`, `Visual Studio Code`, `Microsoft Edge`), not process names (`chrome`, `Code`, `msedge`), so entries must match those. `Electron` is FocusSentinel's own window in development. In memory only — persisting the list is a deliberate exception to the zero-retention rule and needs its own decision.
+Focus: Visual Studio Code, Windows Terminal, Obsidian, Electron (FocusSentinel itself in development), FocusSentinel. Browser: Chrome, Edge, Firefox, Zen. Allowed tab keywords: MDN, Stack Overflow, GitHub, localhost. `get-windows` reports **display names** (`Google Chrome`, `Microsoft Edge`), not process names.
+
+### `AppUsageTracker` / `useUsageTracking(onCredits)`
+*   `accept(sample)` → `UsageCredit | null` (`{ appName, ms, at }`); `reset()`.
+*   The hook delivers `UsageCredit[]` (one per app) every 10s and on unmount. App names only.

@@ -7,16 +7,22 @@ This module manages the user interface (UI) rendering and user interactions with
 ## 1. Directory Manifest & Boundaries
 
 *   **Directory Manifest:**
-    *   `App.tsx`: Root component. Runs `useFocusTracker(DEFAULT_RULES)` and renders `Header`, `FocusStatusPanel`, and `LogConsole` as a capped activity log (one line per change of app or focus state, max 100 lines).
-    *   `global.d.ts`: Declares `window.api` — the single source of truth for what preload exposes to the renderer.
-    *   `components/Header.tsx`: App logo, a static status badge, and window-control buttons (minimize, maximize, close).
-    *   `components/FocusStatusPanel.tsx`: Live focus state, distraction duration, violation count, current app, a visible alert when the sampler fails, and a reset button.
-    *   `components/LogConsole.tsx`: Scrollable, auto-scrolling log display with a clear-logs button. Used as the focus activity log.
-    *   `App.test.tsx`: Vitest + React Testing Library suite: header, window controls, live status, log-per-change, sampler errors, and a privacy check that no window title is ever rendered.
-    *   `setupTests.ts`: Global `window.api` mock, typed against `global.d.ts`.
+    *   `App.tsx`: Root component. Owns every hook (`useAppState`, `usePomodoro`, `useFocusTracker`, `useUsageTracking`, `useFocusCheckIn`, `useLlmModel`) and passes data and callbacks down. Left column: timer and focus status. Right: tabs for Goals, Apps, Coach and Log.
+    *   `global.d.ts`: Declares `window.api`, the single source of truth for what preload exposes to the renderer.
+    *   `components/Header.tsx`: Logo, a static status badge, and window controls.
+    *   `components/PomodoroCard.tsx`: Countdown, Start/Pause, Skip, Reset, and editable lengths.
+    *   `components/FocusStatusPanel.tsx`: Focus state (`Focused` / `Distracted` / `Paused` outside a focus block), distraction time, violations, current app, sampler-error alert, session reset.
+    *   `components/Tabs.tsx`: Accessible tab list (arrow keys move between tabs).
+    *   `components/GoalsPanel.tsx`: Add, tick off, remove and clear goals.
+    *   `components/AppsPanel.tsx`: Every app used, sorted by time, each with a "counts as" select (focus / distraction / browser: judge by tab); allowed tab keywords; two-step "clear usage history".
+    *   `components/CoachPanel.tsx`: Personality picker, model picker with Load and progress, and the list of check-ins (newest first, in memory only).
+    *   `components/LogConsole.tsx`: The activity log, in the Log tab.
+    *   `components/format.ts`: `formatDuration` ("2m 5s") and `formatClock` ("24:30").
+    *   `App.test.tsx`, `components/format.test.ts`: UI tests against the real hooks with `window.api` mocked.
+    *   `setupTests.ts`: Global `window.api` mock, typed against `global.d.ts`; skipped in Node-environment tests.
 *   **Integration Boundaries:**
-    *   **Preload Context Bridge:** Calls `window.api.minimize/maximize/close` and subscribes via `window.api.onFocusEvent` (see [preload/CONTEXT.md](../preload/CONTEXT.md)).
-    *   **Local Services:** `services/focus/` is wired into `App.tsx` (see [services/focus/CONTEXT.md](services/focus/CONTEXT.md)). `services/llm/` is called once per distraction episode through `useFocusCheckIn`, and each outcome is logged. `services/tts/` is not yet wired.
+    *   **Preload Context Bridge:** window controls, `onFocusEvent`, `loadState`/`saveState` (see [preload/CONTEXT.md](../preload/CONTEXT.md)).
+    *   **Local Services:** `services/focus/`, `services/pomodoro/`, `services/session/`, `services/llm/`, each with its own `CONTEXT.md`. `services/tts/` is not yet wired.
 
 > **Privacy.** Nothing in the UI renders a window title — only app names and focus state. `App.test.tsx` asserts this.
 >
@@ -28,52 +34,33 @@ This module manages the user interface (UI) rendering and user interactions with
 
 ```mermaid
 graph TD
-    User[User Clicks Window Control] -->|onClick handler| Header[Header.tsx]
-    Header -->|window.api.minimize/maximize/close| Preload[Preload API Gateway]
-    Preload -->|ipcRenderer.send| Main[Electron Main Process]
-
-    Main -->|focus:event| Preload
-    Preload -->|window.api.onFocusEvent| Hook[useFocusTracker]
-    Hook -->|status, error, reset| App[App.tsx]
-    App --> Panel[FocusStatusPanel]
-    App -->|one line per change| Log[LogConsole]
-
-    App -->|status| CheckIn[useFocusCheckIn]
-    CheckIn -->|evaluate| LLM[services/llm/LlmEvaluator]
-    CheckIn -->|CheckIn result| Log
-    TTS[services/tts/WebSpeechProvider] -.not yet wired.-> App
+    State[useAppState: goals, rules, persona, timer lengths, model, usage] -->|loadState / saveState| Preload[Preload]
+    State --> App[App.tsx]
+    App --> Timer[usePomodoro]
+    Timer -->|isFocusActive| Tracker[useFocusTracker]
+    Preload -->|focus:event| Tracker
+    Preload -->|focus:event| Usage[useUsageTracking]
+    Usage -->|creditUsage every 10s| State
+    Tracker -->|FocusStatus| CheckIn[useFocusCheckIn]
+    Timer -->|remainingSeconds| CheckIn
+    State -->|persona, unfinished goals| CheckIn
+    CheckIn -->|evaluate| LLM[LlmEvaluator]
+    Model[useLlmModel] -->|initialize| LLM
+    App --> Panels[Timer, Focus, Goals, Apps, Coach, Log]
 ```
 
 ---
 
 ## 3. Public Interfaces & Contracts
 
+Components are presentational: props in, callbacks out. Only `App` and the hooks touch `window.api`.
+
 ### Component: `App` (default export)
 *   **Props:** None.
-*   **Description:** Owns the focus session for the window's lifetime. Appends a log line whenever `status.currentApp` or `status.isDistracted` changes — app name and state only, never a title — and one per check-in outcome. Keeps the last 100.
-
-### Component: `Header`
-| Prop | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `onMinimize` | `() => void` | Yes | Called when the minimize button is clicked. |
-| `onMaximize` | `() => void` | Yes | Called when the maximize/restore button is clicked. |
-| `onClose` | `() => void` | Yes | Called when the close button is clicked. |
-
-### Component: `FocusStatusPanel`
-| Prop | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `status` | `FocusStatus` | Yes | Current tracker status. |
-| `error` | `SamplerError \| null` | Yes | Rendered as a `role="alert"` banner when present, so a broken sampler never looks like a focused user. |
-| `onReset` | `() => void` | Yes | Called by the "Reset session" button. |
-
-### Component: `LogConsole`
-| Prop | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `streamLogs` | `string[]` | Yes | Log lines to render. Each entry may be prefixed `typeClass|message` for styling (`info`, `warn`); entries without a `|` render as plain text. |
-| `onClearLogs` | `() => void` | Yes | Called when the "Clear Logs" button is clicked. |
+*   **Description:** Logs one line per change of app or focus state, per focus-block start/stop, and per check-in (max 100). Keeps the last 50 check-ins for the Coach tab. Choosing a model and pressing Load saves the choice and loads it.
 
 ---
 
 ## 4. Testing
-* **`App.test.tsx`**: Header and window controls; live status from emitted samples; one log line per change rather than per sample; a sustained distraction producing a handled check-in failure while the model is unloaded; sampler errors shown as an alert; no window title anywhere in the rendered DOM.
-* **`setupTests.ts`**: Stubs `window.api` with `vi.fn()` mocks for `onFocusEvent`, `minimize`, `maximize`, and `close`. Tests that need to emit focus events override `onFocusEvent` to capture the callback.
+* **`App.test.tsx`**: distractions ignored until a focus block starts; live status during a block; timer start/pause; goals add/tick/remove; saved goals, persona and usage shown after load; changing an app to focus on the Apps tab stops it counting; changes saved after 1s; a check-in failure reported in the Coach tab without stopping tracking; no window title on any tab; sampler errors shown as an alert.
+* The focus-event mock delivers to every subscriber, as preload does, because two hooks subscribe.

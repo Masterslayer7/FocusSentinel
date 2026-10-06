@@ -11,18 +11,37 @@ const INITIAL_STATUS: FocusStatus = {
 
 /**
  * Subscribes to the main-process window sampler and runs every sample through
- * a session-long FocusTracker. Rules are read once, on first render.
+ * a session-long FocusTracker.
+ *
+ * Distractions count only while `isTracking` (a focus block is running).
+ * When tracking stops, the current episode ends; the violation count stays.
  */
-export function useFocusTracker(rules: FocusRules) {
+export function useFocusTracker(rules: FocusRules, isTracking: boolean) {
   // A ref, not state: the tracker is mutable session-long state, and nothing
   // about it should be discarded or recreated by a re-render.
   const trackerRef = useRef<FocusTracker | null>(null);
   if (!trackerRef.current) {
     trackerRef.current = new FocusTracker(rules);
   }
+  const tracker = trackerRef.current;
+
+  // Read inside the subscription, which is set up once.
+  const isTrackingRef = useRef(isTracking);
+  isTrackingRef.current = isTracking;
 
   const [status, setStatus] = useState<FocusStatus>(INITIAL_STATUS);
   const [error, setError] = useState<SamplerError | null>(null);
+
+  useEffect(() => {
+    tracker.setRules(rules);
+  }, [tracker, rules]);
+
+  useEffect(() => {
+    if (!isTracking) {
+      tracker.interrupt();
+      setStatus(tracker.getStatus());
+    }
+  }, [tracker, isTracking]);
 
   useEffect(() => {
     // onFocusEvent returns its own unsubscribe, which doubles as the cleanup.
@@ -32,14 +51,16 @@ export function useFocusTracker(rules: FocusRules) {
         return;
       }
       setError(null);
-      setStatus(trackerRef.current!.accept(event.sample));
+      if (isTrackingRef.current) {
+        setStatus(tracker.accept(event.sample));
+      }
     });
-  }, []);
+  }, [tracker]);
 
   const reset = useCallback(() => {
-    trackerRef.current?.reset();
+    tracker.reset();
     setStatus(INITIAL_STATUS);
-  }, []);
+  }, [tracker]);
 
-  return { status, error, reset };
+  return { status, error, reset, isTracking };
 }

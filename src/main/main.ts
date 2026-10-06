@@ -31,8 +31,10 @@ const sampler = new WindowSampler(SAMPLE_INTERVAL_MS, (event) => {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 900,
-    height: 700,
+    width: 1120,
+    height: 800,
+    minWidth: 900,
+    minHeight: 640,
     frame: false,
     webPreferences: {
       preload: path.join(__dirname, '../preload/preload.js'),

@@ -165,6 +165,19 @@ describe('LlmEvaluator Pub/Sub Service', () => {
     unsubscribe();
   });
 
+  test('isModelCached reports whether the weights are already downloaded', async () => {
+    mockHasModelInCache.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+
+    expect(await llmEvaluator.isModelCached('cached-model')).toBe(true);
+    expect(await llmEvaluator.isModelCached('new-model')).toBe(false);
+  });
+
+  test('isModelCached treats a cache lookup error as not cached', async () => {
+    mockHasModelInCache.mockRejectedValueOnce(new Error('no cache API'));
+
+    expect(await llmEvaluator.isModelCached('any-model')).toBe(false);
+  });
+
   test('should call deleteModelAllInfoInCache() if model is found in cache', async () => {
     mockHasModelInCache.mockResolvedValueOnce(true);
     

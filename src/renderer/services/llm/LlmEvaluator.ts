@@ -96,6 +96,18 @@ export class LlmEvaluator {
   }
 
   /**
+   * Whether a model's weights are already in the browser cache, so loading it
+   * needs no download. A lookup failure counts as "not cached".
+   */
+  public async isModelCached(modelId: string): Promise<boolean> {
+    try {
+      return await hasModelInCache(modelId);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Initializes the MLC Engine and loads model weights into VRAM.
    * Leverages progress callbacks to update download and loading status.
    */

@@ -11,13 +11,15 @@ FocusSentinel is a personal, local-only desktop tool built to help its one user 
 - **Electron + React shell**: window management, custom title bar — working.
 - **Local LLM evaluator** (`src/renderer/services/llm/`): WebGPU-based local inference via `@mlc-ai/web-llm`, decoupled prompt building (see ADR-007). Reusable for the next phase; the existing personas need reframing toward supportive/motivational guidance rather than punitive reprimands.
 - **TTS** (`src/renderer/services/tts/`): `WebSpeechProvider` implemented and tested.
+- **Session tools** (`src/renderer/services/{session,pomodoro}/`, `src/main/StateStore.ts`): a goal list, a Pomodoro timer (distractions count only during focus blocks), a per-app list with time spent and a focus/distraction/browser choice for each, a personality picker, and model loading. Goals, rules, settings and app usage are saved locally (ADR-009). Check-ins call the real model with the goals, time left, persona and distracting app.
 - **Desktop usage tracking** (`src/main/WindowSampler.ts`, `src/renderer/services/focus/`): samples the Windows foreground window every 2s via `get-windows`, judges it against an in-memory allowlist (browsers by tab title, other apps by name), and shows live focus state, distraction duration, and violation count. Runs natively on Windows. See `docs/plans/desktop-usage-tracking.md`.
 - **Camera/YOLO detection pipeline**: removed.
 - **Licensing/tiers**: removed. No monetization plan.
 
 ## What's next (not yet built)
-- A "goal" input so the user can state what they're working on and why, giving the LLM evaluator real context to be supportive rather than generic.
-- Finishing the check-in loop: the focus signal already calls `LlmEvaluator` once per distraction episode, but `evaluate()` still returns a stub, nothing loads the model, `timeRemaining`/goal are placeholders, and replies are logged rather than spoken via TTS. Those remain before the core hypothesis (does a supportive AI check-in actually help) can be tested for real.
+- Speaking check-ins aloud: pipe `useFocusCheckIn` replies into `WebSpeechProvider` (`src/renderer/services/tts/`).
+- Real-use tuning: whether 6 seconds and no grace period feel right, and whether the 2-minute cooldown is too quiet or too chatty.
+- Testing the core hypothesis for real: does a goal-aware check-in actually bring the user back?
 
 ## Engineering Constraints & Rules for AI Assistants
 
