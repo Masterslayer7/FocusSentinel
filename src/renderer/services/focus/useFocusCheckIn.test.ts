@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { useFocusCheckIn, type CheckInEvaluator } from './useFocusCheckIn';
+import { useFocusCheckIn, type CheckInEvaluator, type CheckInSession } from './useFocusCheckIn';
 import type { FocusStatus } from './types';
 
 const focused: FocusStatus = { isDistracted: false, distractionDuration: 0, violationCount: 0, currentApp: 'Code' };
@@ -20,8 +20,14 @@ describe('useFocusCheckIn', () => {
     evaluator = { evaluate };
   });
 
-  const render = (initial: FocusStatus) =>
-    renderHook(({ status }) => useFocusCheckIn(status, evaluator), { initialProps: { status: initial } });
+  const SESSION: CheckInSession = {
+    preset: 'Sarcastic Critic',
+    goals: ['Write the persistence ADR', 'Fix the reset bug'],
+    timeRemainingSeconds: 8 * 60,
+  };
+
+  const render = (initial: FocusStatus, session: CheckInSession = SESSION) =>
+    renderHook(({ status }) => useFocusCheckIn(status, evaluator, session), { initialProps: { status: initial } });
 
   test('does nothing while focused or below the minimum distraction duration', () => {
     const { rerender } = render(focused);
@@ -32,17 +38,20 @@ describe('useFocusCheckIn', () => {
     expect(evaluate).not.toHaveBeenCalled();
   });
 
-  test('checks in once the distraction reaches the threshold, with real counts and labelled placeholders', async () => {
+  test('checks in once the distraction reaches the threshold, with the session it was given', async () => {
     const { rerender, result } = render(focused);
     rerender({ status: distracted(1, 6) });
 
     expect(evaluate).toHaveBeenCalledTimes(1);
     const [preset, context] = evaluate.mock.calls[0];
-    expect(preset).toBe('Supportive Mentor');
-    expect(context.violationCount).toBe(1);
-    expect(context.distractionDuration).toBe(6);
-    expect(context.timeRemaining).toBe(25 * 60);
-    expect(context.activeSessionGoal).toMatch(/placeholder/i);
+    expect(preset).toBe('Sarcastic Critic');
+    expect(context).toEqual({
+      violationCount: 1,
+      distractionDuration: 6,
+      timeRemaining: 8 * 60,
+      sessionGoals: ['Write the persistence ADR', 'Fix the reset bug'],
+      distractingApp: 'Discord',
+    });
 
     await waitFor(() => expect(result.current).toEqual({ episode: 1, outcome: 'replied', text: '[Stub] reply' }));
   });

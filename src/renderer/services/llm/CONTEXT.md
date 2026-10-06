@@ -15,9 +15,11 @@ This directory contains the core services for running local Large Language Model
     *   **Browser WebGPU Engine:** Interfaces directly with the native browser graphics API (`navigator.gpu`) via `@mlc-ai/web-llm`'s `CreateMLCEngine`.
     *   **MLC-AI Engine Core:** Coordinates with the third-party `@mlc-ai/web-llm` module to download CDN weights, cache them (`hasModelInCache`/`deleteModelAllInfoInCache`), and execute inference.
 
-> **Wired to the focus signal.** `useFocusCheckIn` (in `services/focus/`) calls `llmEvaluator.evaluate('Supportive Mentor', context)` once per distraction episode, with real `violationCount` and `distractionDuration` from `FocusTracker`. `timeRemaining` (25 min) and `activeSessionGoal` are **labelled placeholders** — no session timer or goal input exists yet. Nothing in the app calls `initialize()` yet, so in practice every check-in currently fails with "engine is not initialized", which the hook reports as data. Replies are logged, not yet spoken.
+> **Wired to the focus signal.** `useFocusCheckIn` (in `services/focus/`) calls `evaluate(preset, context)` once per distraction episode with the real violation count and duration, the user's unfinished goals, the Pomodoro time remaining, and the distracting app's name (never a window title).
 >
-> **`evaluate()` is currently a stub.** It builds real prompts via `PromptBuilder`, but instead of sending them to the loaded model, it returns a mock string embedding the compiled prompts (`[Stub] [System: ...] [User: ...]`) after an artificial 10ms delay. Real inference (`engine.chat.completions...`) has not been wired in yet. The cooldown/debounce guards and abort handling around it are real and already tested.
+> **`evaluate()` calls the model.** It sends a system message (the persona) and a user message (the session context) to `engine.chat.completions.create` with `temperature: 0.7` and `max_tokens: 96`, then trims the reply back to its last complete sentence. The cooldown, minimum-duration and abort handling around it are unchanged.
+>
+> **Personas were reworded** for desktop distractions and the user's own goals. All four keep their character; none mention phones. `LLM_PRESETS` lists them for pickers.
 
 ---
 
@@ -54,7 +56,8 @@ sequenceDiagram
     LE->>LE: guard: now - lastSpeechTime >= 2min cooldown?
     LE->>PB: buildPrompt(preset, context)
     PB-->>LE: { systemPrompt, userPrompt }
-    Note over LE: STUB — returns "[Stub] ..." instead of calling MLC inference
+    LE->>MLC: chat.completions.create([system, user], max_tokens 96)
+    MLC-->>LE: reply
     LE->>LE: trimTrailingIncompleteSentence(reply)
     LE-->>UI: return cleaned text
 ```
@@ -81,18 +84,19 @@ interface LlmStatusUpdate {
 }
 ```
 
-#### `LlmPreset`
-Derived from the keys of `PromptBuilder`'s `SYSTEM_PRESETS` table (single source of truth).
+#### `LlmPreset` and `LLM_PRESETS`
+Derived from the keys of `PromptBuilder`'s `SYSTEM_PRESETS` table (single source of truth). `LLM_PRESETS` is the same list as an array, in display order.
 *   **Type:** `'Drill Sergeant' | 'Sarcastic Critic' | 'Supportive Mentor' | 'Disappointed Parent'`
-*   **Note:** The first two personas are punitive/shaming in tone, left over from the project's earlier direction. `docs/adr/008-retire-camera-pipeline-and-licensing.md` records a pivot toward supportive, goal-aware guidance — reframing or trimming this preset list is expected as part of that work, not done yet.
+*   **Note:** All four are written for a computer focus block and the user's goals. The harsher two are firm or teasing about the distraction, never insulting to the person.
 
 #### `EvaluatorContext`
 ```typescript
 interface EvaluatorContext {
   violationCount: number;          // Count of distraction events in the session
   distractionDuration: number;     // Consecutive seconds currently distracted
-  timeRemaining: number;           // Remaining Pomodoro focus time, in seconds
-  activeSessionGoal: string;       // User-defined session objective (required)
+  timeRemaining: number;           // Seconds left in the current Pomodoro focus block
+  sessionGoals: string[];          // Unfinished goals; rendered as a bulleted [Session Goals] list, omitted if empty
+  distractingApp?: string;         // App display name only — never a window title
   additionalMetadata?: Record<string, any>;
 }
 ```
@@ -132,7 +136,7 @@ interface EvaluatorContext {
 #### `evaluate(preset, context)`
 *   **Input:** `preset: LlmPreset`, `context: EvaluatorContext`
 *   **Output:** `Promise<string>`
-*   **Description:** Builds a prompt via `PromptBuilder`, applies cooldown (2 min) and minimum-distraction-duration (5s) guards, and returns the (currently stubbed — see note above) cleaned response text. Throws if no engine is initialized.
+*   **Description:** Builds a prompt via `PromptBuilder`, applies cooldown (2 min) and minimum-distraction-duration (5s) guards, and sends both prompts to the model, and returns the reply trimmed to its last complete sentence. Throws if no engine is initialized.
 
 #### `cancel()`
 *   **Output:** `void`

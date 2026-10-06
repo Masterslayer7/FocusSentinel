@@ -194,36 +194,55 @@ describe('LlmEvaluator Pub/Sub Service', () => {
   });
 
   describe('Context Prompt Builder & Sentence Trimming', () => {
-    test('should build correct prompt structure when activeSessionGoal is provided', () => {
+    test('should list every session goal and the session numbers in the user prompt', () => {
       const context: EvaluatorContext = {
         violationCount: 3,
         distractionDuration: 12,
         timeRemaining: 1500, // 25 mins
-        activeSessionGoal: 'Finish writing Chapter 1'
+        sessionGoals: ['Finish writing Chapter 1', 'Reply to the editor']
       };
 
       const result = buildPrompt('Drill Sergeant', context);
       
-      expect(result.systemPrompt).toContain('military Drill Sergeant');
-      expect(result.userPrompt).toContain('[Active Session Goal]: Finish writing Chapter 1');
+      expect(result.systemPrompt).toContain('Drill Sergeant');
+      expect(result.userPrompt).toContain('[Session Goals]:\n- Finish writing Chapter 1\n- Reply to the editor');
       expect(result.userPrompt).toContain('[Violation Count]: 3');
       expect(result.userPrompt).toContain('[Current Distraction Duration]: 12 seconds');
       expect(result.userPrompt).toContain('[Time Remaining in Pomodoro]: 25 minutes');
-      expect(result.userPrompt).toContain('get the user back to their active session goal');
+      expect(result.userPrompt).toContain('get the user back to their session goals');
     });
 
-    test('should omit Active Session Goal and adapt user prompt when goal is empty', () => {
+    test('should name the distracting app when one is given', () => {
+      const context: EvaluatorContext = {
+        violationCount: 1,
+        distractionDuration: 6,
+        timeRemaining: 900,
+        sessionGoals: [],
+        distractingApp: 'Discord'
+      };
+
+      expect(buildPrompt('Supportive Mentor', context).userPrompt).toContain('[Distracting App]: Discord');
+    });
+
+    test('no persona is written about phones any more', () => {
+      const context: EvaluatorContext = { violationCount: 1, distractionDuration: 6, timeRemaining: 900, sessionGoals: [] };
+      for (const preset of ['Drill Sergeant', 'Sarcastic Critic', 'Supportive Mentor', 'Disappointed Parent'] as LlmPreset[]) {
+        expect(buildPrompt(preset, context).systemPrompt.toLowerCase()).not.toContain('phone');
+      }
+    });
+
+    test('should omit Session Goals and adapt user prompt when there are none', () => {
       const context: EvaluatorContext = {
         violationCount: 1,
         distractionDuration: 5,
         timeRemaining: 600, // 10 mins
-        activeSessionGoal: '' // Empty goal
+        sessionGoals: ['   '] // Blank goals are ignored
       };
 
       const result = buildPrompt('Sarcastic Critic', context);
       
-      expect(result.systemPrompt).toContain('witty, dry, and highly sarcastic');
-      expect(result.userPrompt).not.toContain('[Active Session Goal]');
+      expect(result.systemPrompt).toContain('sarcastic');
+      expect(result.userPrompt).not.toContain('[Session Goals]');
       expect(result.userPrompt).toContain('[Violation Count]: 1');
       expect(result.userPrompt).toContain('[Current Distraction Duration]: 5 seconds');
       expect(result.userPrompt).toContain('[Time Remaining in Pomodoro]: 10 minutes');
@@ -235,7 +254,7 @@ describe('LlmEvaluator Pub/Sub Service', () => {
         violationCount: 2,
         distractionDuration: 10,
         timeRemaining: 300,
-        activeSessionGoal: 'Write code',
+        sessionGoals: ['Write code'],
         additionalMetadata: {
           userFocusScore: 0.85,
           activeTabName: 'StackOverflow',
@@ -260,22 +279,27 @@ describe('LlmEvaluator Pub/Sub Service', () => {
   });
 
   describe('Evaluate Logic', () => {
-    test('should construct compiled prompt and return trimmed evaluation stub', async () => {
+    test('should send the compiled prompts to the model and return its trimmed reply', async () => {
       await llmEvaluator.initialize('test-model-id');
+      mockChatCreate.mockResolvedValueOnce({
+        choices: [{ message: { content: 'You were making real progress on the PRD. Close Discord and' } }]
+      });
 
       const context: EvaluatorContext = {
         violationCount: 1,
         distractionDuration: 8,
         timeRemaining: 1200,
-        activeSessionGoal: 'Revise PRD'
+        sessionGoals: ['Revise PRD']
       };
 
       const result = await llmEvaluator.evaluate('Disappointed Parent', context);
       
       expect(llmEvaluator.getState()).toBe('ready');
-      expect(result).toContain('[Stub]');
-      expect(result).toContain('[System: Disappointed Parent]');
-      expect(result).toContain('[Active Session Goal]: Revise PRD');
+      expect(result).toBe('You were making real progress on the PRD.');
+      const request = mockChatCreate.mock.calls[0][0];
+      expect(request.messages[0]).toEqual({ role: 'system', content: buildPrompt('Disappointed Parent', context).systemPrompt });
+      expect(request.messages[1].role).toBe('user');
+      expect(request.messages[1].content).toContain('[Session Goals]:\n- Revise PRD');
       
       llmEvaluator.cancel();
       expect(llmEvaluator.getState()).toBe('ready');
@@ -288,7 +312,7 @@ describe('LlmEvaluator Pub/Sub Service', () => {
         violationCount: 1,
         distractionDuration: 4, // Below 5s threshold
         timeRemaining: 1200,
-        activeSessionGoal: 'Revise PRD'
+        sessionGoals: ['Revise PRD']
       };
 
       const result = await llmEvaluator.evaluate('Disappointed Parent', context);
@@ -307,12 +331,12 @@ describe('LlmEvaluator Pub/Sub Service', () => {
         violationCount: 1,
         distractionDuration: 8,
         timeRemaining: 1200,
-        activeSessionGoal: 'Revise PRD'
+        sessionGoals: ['Revise PRD']
       };
 
       // First call succeeds
       const result1 = await llmEvaluator.evaluate('Disappointed Parent', context);
-      expect(result1).toContain('[Stub]');
+      expect(result1).toBe('Focus');
 
       // Second call within 2 minutes (e.g. 30 seconds later) fails/skips
       mockNow += 30000;
@@ -323,7 +347,7 @@ describe('LlmEvaluator Pub/Sub Service', () => {
       // Third call after more than 2 minutes (e.g. 91 seconds later, total 121 seconds) succeeds
       mockNow += 91000;
       const result3 = await llmEvaluator.evaluate('Disappointed Parent', context);
-      expect(result3).toContain('[Stub]');
+      expect(result3).toBe('Focus');
 
       dateNowSpy.mockRestore();
     });
@@ -335,7 +359,7 @@ describe('LlmEvaluator Pub/Sub Service', () => {
         violationCount: 1,
         distractionDuration: 8,
         timeRemaining: 1200,
-        activeSessionGoal: 'Revise PRD'
+        sessionGoals: ['Revise PRD']
       };
 
       // Initiate evaluation

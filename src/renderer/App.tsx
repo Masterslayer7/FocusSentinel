@@ -12,7 +12,11 @@ const MAX_LOG_LINES = 100;
 
 export default function App() {
   const { status, error, reset } = useFocusTracker(DEFAULT_RULES);
-  const checkIn = useFocusCheckIn(status, llmEvaluator);
+  const checkIn = useFocusCheckIn(status, llmEvaluator, {
+    preset: 'Supportive Mentor',
+    goals: [],
+    timeRemainingSeconds: 25 * 60,
+  });
   const [logs, setLogs] = useState<string[]>([]);
 
   const appendLog = (line: string) =>

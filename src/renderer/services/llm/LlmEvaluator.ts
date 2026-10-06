@@ -209,24 +209,28 @@ export class LlmEvaluator {
 
     // Reset Abort Status
     this.isAborted = false;
-    this.updateStatus('generating', 100, `Generating reprimand using preset: ${preset}...`);
+    this.updateStatus('generating', 100, `Generating check-in using preset: ${preset}...`);
+    const engine = this.engine;
 
     try {
       const { systemPrompt, userPrompt } = buildPrompt(preset, context);
 
-      // During Phase 2 Step 2.4 and 2.5, we will return a structured stub that includes
-      // the system and user prompts to verify correctness in tests and UI console logs.
-      const mockReply = `[Stub] [System: ${preset}] [User: ${userPrompt.replace(/\n/g, ' ')}]`;
-      
-      // Simulate async delay to allow testing cancellation/abort mid-generation
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      const response = await engine.chat.completions.create({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 96, // two spoken sentences, with room to finish the second
+      });
+      const modelReply = response.choices[0]?.message?.content ?? '';
 
-      // Abort Check post-completion (or post-mock)
+      // cancel() interrupts generation, which can still resolve with a partial reply.
       if (this.isAborted) {
         throw new Error("Evaluation aborted");
       }
 
-      const reply = trimTrailingIncompleteSentence(mockReply);
+      const reply = trimTrailingIncompleteSentence(modelReply);
       this.lastSpeechTime = Date.now(); // Record success timestamp
       this.updateStatus('ready', 100, 'Evaluation complete');
       return reply;

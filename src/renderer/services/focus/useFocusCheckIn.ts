@@ -7,19 +7,18 @@ export interface CheckInEvaluator {
   evaluate(preset: LlmPreset, context: EvaluatorContext): Promise<string>;
 }
 
+/** What the user has set up for this session; read when a check-in fires. */
+export interface CheckInSession {
+  preset: LlmPreset;
+  goals: string[];              // unfinished goals only
+  timeRemainingSeconds: number; // from the Pomodoro timer
+}
+
 export interface CheckIn {
   episode: number; // the violationCount it was made for
   outcome: 'replied' | 'skipped' | 'failed';
   text: string;    // the reply, or the error message; '' when skipped
 }
-
-// The only preset aligned with the supportive direction in context.md.
-const PRESET: LlmPreset = 'Supportive Mentor';
-
-// No session timer or goal input exists yet. These are stand-ins, labelled as
-// such so nobody mistakes them for real values.
-const PLACEHOLDER_TIME_REMAINING = 25 * 60;
-const PLACEHOLDER_GOAL = '[placeholder: no goal input yet]';
 
 /**
  * Asks the evaluator for one check-in per distraction episode, once the
@@ -28,7 +27,16 @@ const PLACEHOLDER_GOAL = '[placeholder: no goal input yet]';
  * "Once per episode" means once *attempted*: if the evaluator declines (e.g.
  * its 2-minute cooldown is active), that episode passes without a retry.
  */
-export function useFocusCheckIn(status: FocusStatus, evaluator: CheckInEvaluator): CheckIn | null {
+export function useFocusCheckIn(
+  status: FocusStatus,
+  evaluator: CheckInEvaluator,
+  session: CheckInSession,
+): CheckIn | null {
+  // Read at fire time through a ref: the timer changes this every second, and
+  // that must not re-run the episode logic below.
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
   // violationCount changes exactly once per episode, so it is the episode key.
   const handledEpisode = useRef(0);
   const [checkIn, setCheckIn] = useState<CheckIn | null>(null);
@@ -52,17 +60,19 @@ export function useFocusCheckIn(status: FocusStatus, evaluator: CheckInEvaluator
     const episode = status.violationCount;
     handledEpisode.current = episode;
 
+    const { preset, goals, timeRemainingSeconds } = sessionRef.current;
     const context: EvaluatorContext = {
       violationCount: status.violationCount,
       distractionDuration: status.distractionDuration,
-      timeRemaining: PLACEHOLDER_TIME_REMAINING,
-      activeSessionGoal: PLACEHOLDER_GOAL,
+      timeRemaining: timeRemainingSeconds,
+      sessionGoals: goals,
+      distractingApp: status.currentApp, // app name only, never a title
     };
 
     // evaluate() throws when the model is not loaded. That must never take the
     // tracker down with it, so every outcome becomes data.
     evaluator
-      .evaluate(PRESET, context)
+      .evaluate(preset, context)
       .then((text) => setCheckIn({ episode, outcome: text ? 'replied' : 'skipped', text }))
       .catch((error: unknown) =>
         setCheckIn({ episode, outcome: 'failed', text: error instanceof Error ? error.message : String(error) }),
