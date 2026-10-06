@@ -1,16 +1,6 @@
 import React from 'react';
 import { Header } from './components/Header';
 
-interface Window {
-  api: {
-    minimize: () => void;
-    maximize: () => void;
-    close: () => void;
-  };
-}
-
-declare const window: Window;
-
 export default function App() {
   return (
     <div className="app-container">

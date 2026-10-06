@@ -243,7 +243,8 @@ export class LlmEvaluator {
   public cancel(): void {
     this.isAborted = true;
     if (this.engine) {
-      this.engine.interruptGenerate().catch((err) => {
+      // MLCEngineInterface types this as void, but MLCEngine returns a Promise.
+      Promise.resolve(this.engine.interruptGenerate()).catch((err: unknown) => {
         console.error('[LlmEvaluator] Error interrupting WebLLM generation:', err);
       });
     }

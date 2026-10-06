@@ -121,7 +121,7 @@ describe('WebSpeechProvider', () => {
   });
 
   test('should reject speak on error', async () => {
-    mockSpeechSynthesis.speak.mockImplementation((utterance) => {
+    mockSpeechSynthesis.speak.mockImplementation((utterance: any) => {
       setTimeout(() => {
         if (utterance.onerror) {
           utterance.onerror({ error: 'failed' });

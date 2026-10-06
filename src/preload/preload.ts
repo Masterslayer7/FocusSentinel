@@ -1,24 +1,22 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
+import type { SamplerEvent } from '../shared/types';
+
+// Duplicated in main.ts on purpose: a sandboxed preload can require 'electron'
+// but not local modules, so this cannot be a runtime import from src/shared/.
+const FOCUS_EVENT_CHANNEL = 'focus:event';
 
 contextBridge.exposeInMainWorld('api', {
   /**
-   * Listen for real-time telemetry updates broadcast from the Python child process.
+   * Subscribe to foreground-window samples from the main process.
+   * Returns an unsubscribe function for clean cleanup in UI components.
    */
-  onTelemetry: (callback: (data: any) => void) => {
-    const subscription = (_event: any, value: any) => callback(value);
-    ipcRenderer.on('python-telemetry', subscription);
-    
-    // Return unsubscribe function for clean cleanup in UI components
-    return () => {
-      ipcRenderer.removeListener('python-telemetry', subscription);
-    };
-  },
+  onFocusEvent: (callback: (event: SamplerEvent) => void): (() => void) => {
+    const subscription = (_event: IpcRendererEvent, value: SamplerEvent) => callback(value);
+    ipcRenderer.on(FOCUS_EVENT_CHANNEL, subscription);
 
-  /**
-   * Send a control command from the UI down to the Python subprocess.
-   */
-  sendCommand: (action: string, data: Record<string, any> = {}) => {
-    ipcRenderer.send('send-to-python', { action, data });
+    return () => {
+      ipcRenderer.removeListener(FOCUS_EVENT_CHANNEL, subscription);
+    };
   },
 
   /**

@@ -42,8 +42,22 @@ sequenceDiagram
     else production
         Win->>Win: loadFile(dist/renderer/index.html)
     end
+    Win-->>Main: did-finish-load (once per window)
+    Main->>Main: sampler.start() — no-op if already running
     Main->>Main: register ipcMain window-control listeners
 ```
+
+### Focus Sampling Flow
+```mermaid
+graph LR
+    OS[Win32 foreground window] -->|get-windows activeWindow, every 2s| Sampler[WindowSampler]
+    Sampler -->|SamplerEvent| Main[main.ts callback]
+    Main -->|webContents.send focus:event| Preload[Preload Context Bridge]
+    Preload -->|window.api.onFocusEvent| Renderer[Renderer]
+    Closed[window closed / before-quit] -->|sampler.stop| Sampler
+```
+
+The sampler is constructed once at module scope rather than inside `createWindow()`, because `activate` can call `createWindow()` again; a per-window sampler would leave the old interval running. It starts on `did-finish-load` because a `webContents.send` before the page has loaded is silently dropped.
 
 ### Window Control Flow
 ```mermaid
@@ -67,6 +81,9 @@ Applied once at module load, before `app.whenReady()`:
 *   **Output:** `void`
 *   **Description:** Creates a frameless (`frame: false`) `900x700` `BrowserWindow` with `contextIsolation: true` and `nodeIntegration: false`, wired to the preload script at `dist/preload/preload.js`. Loads the Vite dev server in development (retrying on `did-fail-load`) or the built `index.html` in production.
 
+### Main → Renderer Channels
+*   **`'focus:event'`**: One `SamplerEvent` per sampler tick (every 2000ms), sent to the current window. The name is duplicated in `preload.ts`; see [preload/CONTEXT.md](../preload/CONTEXT.md).
+
 ### Main IPC Listeners (Preload Channel Gating)
 Registered inside `app.whenReady()`:
 *   **`'window-minimize'`**: Minimizes the desktop application window.
@@ -74,6 +91,7 @@ Registered inside `app.whenReady()`:
 *   **`'window-close'`**: Closes the application window.
 
 ### App Lifecycle Hooks
+*   **`app.on('before-quit')`**: Stops the window sampler.
 *   **`app.on('activate')`**: Re-creates the window if none exist (macOS dock-icon click behavior).
 *   **`app.on('window-all-closed')`**: Quits the app on all platforms except macOS.
 

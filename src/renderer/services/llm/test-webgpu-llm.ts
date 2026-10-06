@@ -1,14 +1,20 @@
 import { CreateMLCEngine } from "@mlc-ai/web-llm";
 
+// Just the slice of WebGPU this check uses; TypeScript's DOM lib does not declare navigator.gpu.
+type GpuNavigator = Navigator & {
+  gpu?: { requestAdapter(): Promise<{ name?: string } | null> };
+};
+
 export async function checkWebGPUSupport(): Promise<{ supported: boolean; details?: string }> {
-  if (!navigator.gpu) {
+  const { gpu } = navigator as GpuNavigator;
+  if (!gpu) {
     return {
       supported: false,
       details: "WebGPU is not supported in this environment (navigator.gpu is undefined)."
     };
   }
   try {
-    const adapter = await navigator.gpu.requestAdapter();
+    const adapter = await gpu.requestAdapter();
     if (!adapter) {
       return {
         supported: false,
