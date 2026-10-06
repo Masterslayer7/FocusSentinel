@@ -29,7 +29,12 @@
   },
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.84",
+    "get-windows": "^9.3.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
+  },
+  "allowScripts": {
+    "electron@30.5.1": true,
+    "get-windows@9.3.0": true
   }
 }

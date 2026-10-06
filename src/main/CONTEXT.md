@@ -8,12 +8,17 @@ This module manages the Electron Main Process: desktop window lifecycle, GPU/Web
 
 *   **Directory Manifest:**
     *   `main.ts`: Main process entry point. Configures GPU command-line switches, creates the `BrowserWindow`, handles Vite dev-server loading (with auto-retry) vs. production file loading, and registers window-control IPC listeners.
+    *   `WindowSampler.ts`: Polls the OS for the foreground window on an interval and emits a `SamplerEvent` per tick. No rules or decisions — those live in `FocusTracker` in the renderer (see [renderer/services/focus/CONTEXT.md](../renderer/services/focus/CONTEXT.md)).
 *   **Integration Boundaries:**
     *   **IPC Communication:** Receives window-control requests from the Renderer via the Preload context bridge (see [preload/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/preload/CONTEXT.md)) over Electron `ipcMain` channels.
     *   **Electron Runtime APIs:** Directly drives `app` and `BrowserWindow` lifecycle events.
     *   **Chromium GPU Flags:** Configures command-line switches consumed by Electron's underlying Chromium renderer, enabling WebGPU for the local LLM evaluator (see [renderer/services/llm/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/renderer/services/llm/CONTEXT.md)) even inside virtualized/WSL2 environments.
+    *   **`get-windows` (native N-API addon):** `WindowSampler` reads the foreground window through it, in-process. The package is ESM-only while this process compiles to CommonJS, so it is loaded with a dynamic `import()` — which only survives compilation because `tsconfig.json` sets `module: node16`. Its `owner.name` is the app's display name (`Google Chrome`, `Visual Studio Code`), not the process name. A missing native binary does not throw; `activeWindow()` returns `undefined`, which the sampler reports as an `addon-unavailable` error.
+    *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent`, the shapes that cross into the renderer.
 
-> There is currently no subprocess or background pipeline running alongside the window — the previous Python computer-vision bridge (`PythonBridge`, stdio NDJSON contract) was removed. See `docs/adr/008-retire-camera-pipeline-and-licensing.md`. The next distraction-tracking signal (planned: desktop/active-window usage) is expected to run in-process rather than via a spawned subprocess, but is not yet built.
+> There is no subprocess running alongside the window — the previous Python computer-vision bridge (`PythonBridge`, stdio NDJSON contract) was removed. See `docs/adr/008-retire-camera-pipeline-and-licensing.md`. Its replacement signal, `WindowSampler`, runs in-process through a native addon; nothing is spawned.
+>
+> `WindowSampler` never logs a sample. `windowTitle` is personal activity data (`context.md` constraint 1).
 
 ---
 
@@ -71,3 +76,23 @@ Registered inside `app.whenReady()`:
 ### App Lifecycle Hooks
 *   **`app.on('activate')`**: Re-creates the window if none exist (macOS dock-icon click behavior).
 *   **`app.on('window-all-closed')`**: Quits the app on all platforms except macOS.
+
+### `WindowSampler` Class
+
+#### `constructor(intervalMs, onEvent)`
+*   **Input:** `intervalMs: number`, `onEvent: (event: SamplerEvent) => void`
+*   **Description:** Configures the polling interval and the single callback every sample or error is delivered to.
+
+#### `start()`
+*   **Output:** `Promise<void>`
+*   **Description:** Loads `get-windows`, reports one sample immediately, then one per interval. No-op if already running. If the package cannot load, emits `{ kind: 'error', error: { reason: 'addon-unavailable' } }` and does not start the timer. A query that is still in flight when the next tick fires causes that tick to be skipped rather than queued.
+
+#### `stop()`
+*   **Description:** Clears the timer and drops the module reference, so a later `start()` re-imports and re-checks the addon. Safe to call repeatedly.
+
+#### `SamplerEvent` (from `src/shared/types.ts`)
+```typescript
+type SamplerEvent =
+  | { kind: 'sample'; sample: WindowSample }  // timestamp = Date.now() at query time
+  | { kind: 'error'; error: { reason: 'addon-unavailable' | 'query-failed'; message: string } };
+```
