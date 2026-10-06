@@ -41,6 +41,38 @@ export interface PomodoroSettings {
   longBreakEvery: number; // a long break follows every Nth completed focus block
 }
 
+/** One item on the user's goal list. */
+export interface Goal {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/** Total time spent in one app, across sessions. Keyed by app display name. */
+export interface AppUsageEntry {
+  seconds: number;
+  lastSeen: number; // ms since epoch
+}
+
+/**
+ * Everything saved to disk (ADR-009). Deliberately has no field that could
+ * hold a window title.
+ */
+export interface PersistedState {
+  goals: Goal[];
+  rules: FocusRules;
+  persona: string;
+  pomodoro: PomodoroSettings;
+  modelId: string | null;
+  appUsage: Record<string, AppUsageEntry>;
+}
+
+/**
+ * What state:load returns: only the fields that were present and valid on
+ * disk. The renderer fills the rest from its own defaults.
+ */
+export type StoredState = Partial<PersistedState>;
+
 /** Why the sampler cannot currently report samples. */
 export interface SamplerError {
   reason: 'addon-unavailable' | 'query-failed';

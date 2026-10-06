@@ -30,6 +30,8 @@ graph LR
     Preload -- ipcRenderer.send window-* --> Main[Main Process]
 
     Main -- webContents.send focus:event, SamplerEvent --> Preload
+    Renderer -- window.api.loadState/saveState --> Preload
+    Preload -- ipcRenderer.invoke state:load / state:save --> Main
     Preload -- window.api.onFocusEvent callback --> Renderer
 ```
 
@@ -43,6 +45,15 @@ The Main World context exposes the following methods on the global `window.api` 
 *   **Input:** `callback: (event: SamplerEvent) => void`
 *   **Output:** `() => void` (Unsubscribe function)
 *   **Description:** Subscribes a listener to the `'focus:event'` IPC channel, on which `WindowSampler` in the main process emits one `SamplerEvent` every 2 seconds — either a `WindowSample` or a `SamplerError`. See `src/shared/types.ts` and [main/CONTEXT.md](../main/CONTEXT.md).
+
+### `window.api.loadState()`
+*   **Output:** `Promise<StoredState>` — only the fields that were present and valid on disk.
+*   **Description:** Invokes `'state:load'` (ADR-009).
+
+### `window.api.saveState(state)`
+*   **Input:** `state: PersistedState`
+*   **Output:** `Promise<void>`
+*   **Description:** Invokes `'state:save'`. The main process validates before writing.
 
 ### `window.api.minimize()`
 *   **Input:** None

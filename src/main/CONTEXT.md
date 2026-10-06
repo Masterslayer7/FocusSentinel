@@ -8,13 +8,17 @@ This module manages the Electron Main Process: desktop window lifecycle, GPU/Web
 
 *   **Directory Manifest:**
     *   `main.ts`: Main process entry point. Configures GPU command-line switches, creates the `BrowserWindow`, handles Vite dev-server loading (with auto-retry) vs. production file loading, and registers window-control IPC listeners.
+    *   `StateStore.ts`: Loads and saves the one persisted state file (ADR-009) in `app.getPath('userData')`. Atomic writes (temp file + rename), saves serialized in call order, a corrupt file moved aside as `*.corrupt-<ms>` rather than overwritten.
+    *   `storedState.ts`: `parseStoredState`, a pure validator run on every load *and* every save. Keeps only valid fields, drops bad list entries one by one, ignores unknown fields and prototype-altering keys. Knows no defaults.
+    *   `StateStore.test.ts`, `storedState.test.ts`: Node-environment tests (a `@vitest-environment node` docblock), against a real temp directory.
     *   `WindowSampler.ts`: Polls the OS for the foreground window on an interval and emits a `SamplerEvent` per tick. No rules or decisions — those live in `FocusTracker` in the renderer (see [renderer/services/focus/CONTEXT.md](../renderer/services/focus/CONTEXT.md)).
 *   **Integration Boundaries:**
     *   **IPC Communication:** Receives window-control requests from the Renderer via the Preload context bridge (see [preload/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/preload/CONTEXT.md)) over Electron `ipcMain` channels.
     *   **Electron Runtime APIs:** Directly drives `app` and `BrowserWindow` lifecycle events.
     *   **Chromium GPU Flags:** Configures command-line switches consumed by Electron's underlying Chromium renderer, enabling WebGPU for the local LLM evaluator (see [renderer/services/llm/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/renderer/services/llm/CONTEXT.md)) even inside virtualized/WSL2 environments.
     *   **`get-windows` (native N-API addon):** `WindowSampler` reads the foreground window through it, in-process. The package is ESM-only while this process compiles to CommonJS, so it is loaded with a dynamic `import()` — which only survives compilation because `tsconfig.json` sets `module: node16`. Its `owner.name` is the app's display name (`Google Chrome`, `Visual Studio Code`), not the process name. A missing native binary does not throw; `activeWindow()` returns `undefined`, which the sampler reports as an `addon-unavailable` error.
-    *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent`, the shapes that cross into the renderer.
+    *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent`, the shapes that cross into the renderer, and `PersistedState`/`StoredState` for the saved file.
+    *   **Filesystem:** only `StateStore` touches it, and only its one file (ADR-009). Window titles are never written — `PersistedState` has no field that could hold one.
 
 > There is no subprocess running alongside the window — the previous Python computer-vision bridge (`PythonBridge`, stdio NDJSON contract) was removed. See `docs/adr/008-retire-camera-pipeline-and-licensing.md`. Its replacement signal, `WindowSampler`, runs in-process through a native addon; nothing is spawned.
 >
@@ -80,6 +84,10 @@ Applied once at module load, before `app.whenReady()`:
 *   **Input:** None
 *   **Output:** `void`
 *   **Description:** Creates a frameless (`frame: false`) `900x700` `BrowserWindow` with `contextIsolation: true` and `nodeIntegration: false`, wired to the preload script at `dist/preload/preload.js`. Loads the Vite dev server in development (retrying on `did-fail-load`) or the built `index.html` in production.
+
+### Persistence (invoke/handle)
+*   **`'state:load'`** → `StoredState`: the valid parts of the saved file, `{}` on first run or if the file is unreadable.
+*   **`'state:save'`** (`PersistedState`) → `void`: validated, then written atomically. The payload is treated as untrusted.
 
 ### Main → Renderer Channels
 *   **`'focus:event'`**: One `SamplerEvent` per sampler tick (every 2000ms), sent to the current window. The name is duplicated in `preload.ts`; see [preload/CONTEXT.md](../preload/CONTEXT.md).

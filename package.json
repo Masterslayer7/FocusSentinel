@@ -9,7 +9,7 @@
     "dev": "tsc && concurrently -k \"vite\" \"cross-env ELECTRON_IS_DEV=1 electron .\"",
     "start": "npm run build && electron .",
     "test:ui": "vitest run",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json && tsc -p tsconfig.main-tests.json"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",

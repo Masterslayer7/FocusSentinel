@@ -19,6 +19,9 @@ export default defineConfig({
     },
   },
   test: {
+    // Scan all of src/, not just the vite root, so main-process logic is tested too.
+    // Main-process test files opt into Node with a `@vitest-environment node` docblock.
+    dir: path.resolve(__dirname, 'src'),
     globals: true,
     environment: 'jsdom',
     setupFiles: path.resolve(__dirname, 'src/renderer/setupTests.ts'),

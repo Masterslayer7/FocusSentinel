@@ -1,6 +1,8 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
 import { WindowSampler } from './WindowSampler';
+import { StateStore } from './StateStore';
+import type { PersistedState } from '../shared/types';
 
 // Configure GPU switches to allow hardware acceleration to function inside virtualized/WSL environments or over network shares without context failures
 app.commandLine.appendSwitch('disable-gpu-sandbox');
@@ -65,6 +67,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Saved goals, settings and app usage (ADR-009), in the per-user data folder.
+  const store = new StateStore(app.getPath('userData'));
+  ipcMain.handle('state:load', () => store.load());
+  // The payload is untrusted: StateStore validates it before writing.
+  ipcMain.handle('state:save', (_event, state: unknown) => store.save(state as PersistedState));
+
   createWindow();
 
   // IPC listeners for custom window controls
