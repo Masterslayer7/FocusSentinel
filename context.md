@@ -17,7 +17,7 @@ FocusSentinel is a personal, local-only desktop tool built to help its one user 
 
 ## What's next (not yet built)
 - A "goal" input so the user can state what they're working on and why, giving the LLM evaluator real context to be supportive rather than generic.
-- Wiring the LLM evaluator and TTS into that signal end-to-end, so the core hypothesis (does a supportive AI check-in actually help) can be tested for real.
+- Finishing the check-in loop: the focus signal already calls `LlmEvaluator` once per distraction episode, but `evaluate()` still returns a stub, nothing loads the model, `timeRemaining`/goal are placeholders, and replies are logged rather than spoken via TTS. Those remain before the core hypothesis (does a supportive AI check-in actually help) can be tested for real.
 
 ## Engineering Constraints & Rules for AI Assistants
 

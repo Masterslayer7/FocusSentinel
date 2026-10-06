@@ -70,6 +70,19 @@ describe('FocusSentinel App React UI', () => {
     expect(screen.getByTestId('focus-app').textContent).toBe('Google Chrome');
   });
 
+  test('a sustained distraction triggers a check-in; an unloaded model is logged, not fatal', async () => {
+    render(<App />);
+
+    act(() => emit(sample('Discord', 'general', 0)));
+    act(() => emit(sample('Discord', 'general', 6)));
+
+    await screen.findByText(/check-in #1 failed: .*not initialized/);
+
+    // The tracker keeps working after the failed check-in.
+    act(() => emit(sample('Discord', 'general', 8)));
+    expect(screen.getByTestId('focus-duration').textContent).toBe('8s');
+  });
+
   test('a sampler error is shown, not silently read as focused', () => {
     render(<App />);
 

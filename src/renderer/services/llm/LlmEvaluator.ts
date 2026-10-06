@@ -1,7 +1,8 @@
 import { CreateMLCEngine, type MLCEngineInterface, hasModelInCache, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
-import { LlmPreset, EvaluatorContext, buildPrompt, trimTrailingIncompleteSentence } from "./PromptBuilder";
+import { buildPrompt, trimTrailingIncompleteSentence } from "./PromptBuilder";
+import type { LlmPreset, EvaluatorContext } from "./PromptBuilder";
 
-export { LlmPreset, EvaluatorContext };
+export type { LlmPreset, EvaluatorContext };
 
 export type LlmState = 'uninitialized' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error';
 
@@ -12,6 +13,9 @@ export interface LlmStatusUpdate {
 }
 
 export type LlmStateListener = (status: LlmStatusUpdate) => void;
+
+/** evaluate() returns '' for distractions shorter than this. Exported so callers can gate on the same value. */
+export const MIN_DISTRACTION_SECONDS = 5;
 
 export class LlmEvaluator {
   private listeners = new Set<LlmStateListener>();
@@ -25,7 +29,7 @@ export class LlmEvaluator {
   // Time-based thresholds and state trackers
   private lastSpeechTime = 0;                    // timestamp in milliseconds
   private readonly speechCooldown = 120000;       // in milliseconds (2 minutes)
-  private readonly minDistractionDuration = 5;    // in seconds
+  private readonly minDistractionDuration = MIN_DISTRACTION_SECONDS;
   private isAborted = false;
 
   /**
@@ -192,7 +196,7 @@ export class LlmEvaluator {
 
     // Debounce Guard: verify distraction duration threshold
     if (context.distractionDuration < this.minDistractionDuration) {
-      this.updateStatus('ready', 100, `Evaluation skipped: distraction duration (${context.distractionDuration}s) below 5s`);
+      this.updateStatus('ready', 100, `Evaluation skipped: distraction duration (${context.distractionDuration}s) below ${this.minDistractionDuration}s`);
       return '';
     }
 

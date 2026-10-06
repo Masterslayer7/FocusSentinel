@@ -16,7 +16,7 @@ This module manages the user interface (UI) rendering and user interactions with
     *   `setupTests.ts`: Global `window.api` mock, typed against `global.d.ts`.
 *   **Integration Boundaries:**
     *   **Preload Context Bridge:** Calls `window.api.minimize/maximize/close` and subscribes via `window.api.onFocusEvent` (see [preload/CONTEXT.md](../preload/CONTEXT.md)).
-    *   **Local Services:** `services/focus/` is wired into `App.tsx` (see [services/focus/CONTEXT.md](services/focus/CONTEXT.md)). `services/llm/` and `services/tts/` are not yet wired.
+    *   **Local Services:** `services/focus/` is wired into `App.tsx` (see [services/focus/CONTEXT.md](services/focus/CONTEXT.md)). `services/llm/` is called once per distraction episode through `useFocusCheckIn`, and each outcome is logged. `services/tts/` is not yet wired.
 
 > **Privacy.** Nothing in the UI renders a window title — only app names and focus state. `App.test.tsx` asserts this.
 >
@@ -38,7 +38,9 @@ graph TD
     App --> Panel[FocusStatusPanel]
     App -->|one line per change| Log[LogConsole]
 
-    LLM[services/llm/LlmEvaluator] -.not yet wired.-> App
+    App -->|status| CheckIn[useFocusCheckIn]
+    CheckIn -->|evaluate| LLM[services/llm/LlmEvaluator]
+    CheckIn -->|CheckIn result| Log
     TTS[services/tts/WebSpeechProvider] -.not yet wired.-> App
 ```
 
@@ -48,7 +50,7 @@ graph TD
 
 ### Component: `App` (default export)
 *   **Props:** None.
-*   **Description:** Owns the focus session for the window's lifetime. Appends a log line whenever `status.currentApp` or `status.isDistracted` changes — app name and state only, never a title — and keeps the last 100.
+*   **Description:** Owns the focus session for the window's lifetime. Appends a log line whenever `status.currentApp` or `status.isDistracted` changes — app name and state only, never a title — and one per check-in outcome. Keeps the last 100.
 
 ### Component: `Header`
 | Prop | Type | Required | Description |
@@ -73,5 +75,5 @@ graph TD
 ---
 
 ## 4. Testing
-* **`App.test.tsx`**: Header and window controls; live status from emitted samples; one log line per change rather than per sample; sampler errors shown as an alert; no window title anywhere in the rendered DOM.
+* **`App.test.tsx`**: Header and window controls; live status from emitted samples; one log line per change rather than per sample; a sustained distraction producing a handled check-in failure while the model is unloaded; sampler errors shown as an alert; no window title anywhere in the rendered DOM.
 * **`setupTests.ts`**: Stubs `window.api` with `vi.fn()` mocks for `onFocusEvent`, `minimize`, `maximize`, and `close`. Tests that need to emit focus events override `onFocusEvent` to capture the callback.

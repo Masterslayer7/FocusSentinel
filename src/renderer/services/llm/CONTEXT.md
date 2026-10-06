@@ -15,7 +15,7 @@ This directory contains the core services for running local Large Language Model
     *   **Browser WebGPU Engine:** Interfaces directly with the native browser graphics API (`navigator.gpu`) via `@mlc-ai/web-llm`'s `CreateMLCEngine`.
     *   **MLC-AI Engine Core:** Coordinates with the third-party `@mlc-ai/web-llm` module to download CDN weights, cache them (`hasModelInCache`/`deleteModelAllInfoInCache`), and execute inference.
 
-> **Not yet wired into the app.** Nothing in `App.tsx` currently calls `llmEvaluator`. Integrating it with a real distraction signal and a goal-input UI is the next planned increment (see root `context.md`).
+> **Wired to the focus signal.** `useFocusCheckIn` (in `services/focus/`) calls `llmEvaluator.evaluate('Supportive Mentor', context)` once per distraction episode, with real `violationCount` and `distractionDuration` from `FocusTracker`. `timeRemaining` (25 min) and `activeSessionGoal` are **labelled placeholders** — no session timer or goal input exists yet. Nothing in the app calls `initialize()` yet, so in practice every check-in currently fails with "engine is not initialized", which the hook reports as data. Replies are logged, not yet spoken.
 >
 > **`evaluate()` is currently a stub.** It builds real prompts via `PromptBuilder`, but instead of sending them to the loaded model, it returns a mock string embedding the compiled prompts (`[Stub] [System: ...] [User: ...]`) after an artificial 10ms delay. Real inference (`engine.chat.completions...`) has not been wired in yet. The cooldown/debounce guards and abort handling around it are real and already tested.
 
@@ -26,7 +26,7 @@ This directory contains the core services for running local Large Language Model
 ### Subsystem Layout
 ```mermaid
 graph TD
-    UI[UI Components — not yet wired] -->|Subscribe / Trigger| Service[LlmEvaluator Singleton]
+    UI[useFocusCheckIn — once per distraction episode] -->|evaluate| Service[LlmEvaluator Singleton]
     Service -->|buildPrompt| PromptBuilder[PromptBuilder]
     Service -->|CreateMLCEngine| MLC[MLCEngineInterface]
     MLC -->|Cache Storage| Storage[(Browser Cache API)]
@@ -64,6 +64,10 @@ sequenceDiagram
 ## 3. Public Interfaces & Contracts
 
 ### Data Structures
+
+#### `MIN_DISTRACTION_SECONDS`
+*   **Value:** `5`
+*   **Description:** `evaluate()` returns `''` for distractions shorter than this. Exported so callers (`useFocusCheckIn`) gate on the same value instead of duplicating it. With the sampler ticking every 2s, the first check-in of an episode fires at `distractionDuration: 6`.
 
 #### `LlmState`
 *   **Type:** `'uninitialized' | 'downloading' | 'loading' | 'ready' | 'generating' | 'error'`
