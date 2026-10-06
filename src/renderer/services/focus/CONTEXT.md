@@ -1,0 +1,125 @@
+# Focus Tracking Subsystem
+
+This directory decides whether the user is on-task from a stream of foreground-window samples, and reports how long the current distraction has lasted and how many have occurred this session. It produces the `violationCount` and `distractionDuration` fields of `LlmEvaluator`'s `EvaluatorContext`.
+
+It holds every rule and all the state, but never calls an OS API — samples are fed in from outside. That split is what makes it fully testable, and it mirrors the `LlmEvaluator`/`PromptBuilder` split in ADR-007. See `docs/plans/desktop-usage-tracking.md` for the plan and `docs/plans/desktop-usage-tracking-implementation-guide.md` for the decisions behind it.
+
+---
+
+## 1. Directory Manifest & Boundaries
+
+*   **Directory Manifest:**
+    *   `types.ts`: `FocusStatus` and `FocusRules`, plus a re-export of the shared `WindowSample` so consumers import everything from here.
+    *   `FocusTracker.ts`: The state machine and the hybrid allowlist rule. Pure logic — no timers, no `Date.now()`, no OS access.
+    *   `FocusTracker.test.ts`: Test suite covering distraction episodes, duration arithmetic, case-insensitive matching, reset, and the browser-title rule.
+*   **Integration Boundaries:**
+    *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent` live there because they cross the main → preload → renderer boundary. Import them with `import type` only — the file sits outside vite's `root`, and only type-only imports are erased before resolution.
+
+> **Not yet wired into the app.** No sampler exists yet, so nothing feeds `FocusTracker` real samples, and nothing reads its status. The `get-windows` sampler (Milestone 2), the typed IPC channel (Milestone 3), and the renderer hook (Milestone 4) are the next planned increments.
+
+> **Privacy.** `windowTitle` is personal activity data (`context.md` constraint 1). The tracker compares it in memory and never stores it; `FocusStatus` deliberately carries the app name only. Do not render, log, or persist titles.
+
+---
+
+## 2. Architecture & Flow
+
+Planned end-to-end flow. Grey nodes do not exist yet.
+
+```mermaid
+graph LR
+    OS[Win32 foreground window] -->|get-windows N-API addon| Sampler[WindowSampler — main process]
+    Sampler -->|SamplerEvent over IPC| Bridge[preload contextBridge]
+    Bridge --> Hook[useFocusTracker — renderer]
+    Hook --> Tracker[FocusTracker — pure logic]
+    Tracker -->|FocusStatus| UI[LogConsole status line]
+    Tracker -->|violationCount, distractionDuration| Llm[LlmEvaluator — stub]
+
+    style Sampler fill:#6b7280,stroke:#374151,color:#fff
+    style Bridge fill:#6b7280,stroke:#374151,color:#fff
+    style Hook fill:#6b7280,stroke:#374151,color:#fff
+    style UI fill:#6b7280,stroke:#374151,color:#fff
+    style Llm fill:#6b7280,stroke:#374151,color:#fff
+```
+
+### The decision rule (hybrid allowlist)
+
+For a browser the app name says nothing useful — the tab is the activity — so browsers are judged on title. Every other app is judged on its name, and its title is ignored.
+
+```mermaid
+graph TD
+    Sample[WindowSample] --> IsBrowser{appName matches rules.browsers?}
+    IsBrowser -->|yes| TitleMatch{windowTitle matches allowedBrowserTitles?}
+    IsBrowser -->|no| AppMatch{appName matches allowedApps?}
+    TitleMatch -->|yes| Allowed[Allowed]
+    TitleMatch -->|no| Denied[Distracting]
+    AppMatch -->|yes| Allowed
+    AppMatch -->|no| Denied
+```
+
+### State machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> Focused
+    Focused --> Distracted: disallowed sample — violationCount++, distractionStart = sample.timestamp
+    Distracted --> Distracted: another disallowed sample — duration grows, count unchanged
+    Distracted --> Focused: allowed sample — duration resets to 0, no grace period
+```
+
+A violation is counted only on the transition into `Distracted`, so switching directly from one disallowed app to another is one continuous distraction, not two. There is no grace period: a brief flick to an allowed window ends the episode, and returning starts a new one.
+
+---
+
+## 3. Public Interfaces & Contracts
+
+### Data Structures
+
+#### `WindowSample` (from `src/shared/types.ts`)
+```typescript
+interface WindowSample {
+  appName: string;
+  windowTitle: string;
+  timestamp: number; // ms since epoch, supplied by the sampler
+}
+```
+
+#### `FocusStatus`
+```typescript
+interface FocusStatus {
+  isDistracted: boolean;
+  distractionDuration: number; // consecutive SECONDS in the current distraction; 0 when focused
+  violationCount: number;      // distinct distraction episodes this session
+  currentApp: string;
+}
+```
+
+#### `FocusRules`
+```typescript
+interface FocusRules {
+  allowedApps: string[];          // matched against appName, for non-browsers
+  browsers: string[];             // appNames whose windowTitle is judged instead
+  allowedBrowserTitles: string[]; // matched against windowTitle, for browsers only
+}
+```
+
+All matching is case-insensitive substring matching. That is forgiving in the useful direction (`'Code'` matches `"Visual Studio Code"`) and loose in the other (`'Code'` would also match `"Codecademy"`). For a personal tool tuned by its only user, that trade is accepted.
+
+---
+
+### `FocusTracker` Class
+
+#### `constructor(rules)`
+*   **Input:** `rules: FocusRules`
+*   **Description:** Starts in the focused state with all counters at zero. Rules are fixed for the tracker's lifetime.
+
+#### `accept(sample)`
+*   **Input:** `sample: WindowSample`
+*   **Output:** `FocusStatus`
+*   **Description:** Feeds one observation in and returns the resulting status. All time arithmetic uses `sample.timestamp`, never the wall clock. Duration is floored to whole seconds and clamped at zero, so an out-of-order sample cannot produce a negative value.
+
+#### `getStatus()`
+*   **Output:** `FocusStatus`
+*   **Description:** Returns the current status as a fresh object, so a consumer (e.g. React state) holding an earlier status never sees it change underneath it.
+
+#### `reset()`
+*   **Description:** Returns every counter to the initial state, as at construction.

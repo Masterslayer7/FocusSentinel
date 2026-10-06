@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["vitest/globals"]
+  },
+  "include": ["src/renderer/services/focus/**/*", "src/shared/**/*"],
+  "exclude": []
+}
