@@ -12,10 +12,15 @@ It holds every rule and all the state, but never calls an OS API — samples are
     *   `types.ts`: `FocusStatus` and `FocusRules`, plus a re-export of the shared `WindowSample` so consumers import everything from here.
     *   `FocusTracker.ts`: The state machine and the hybrid allowlist rule. Pure logic — no timers, no `Date.now()`, no OS access.
     *   `FocusTracker.test.ts`: Test suite covering distraction episodes, duration arithmetic, case-insensitive matching, reset, and the browser-title rule.
+    *   `useFocusTracker.ts`: React hook. Subscribes to `window.api.onFocusEvent`, runs each sample through a session-long `FocusTracker` held in a ref, and exposes `{ status, error, reset }`.
+    *   `useFocusTracker.test.ts`: Hook tests — subscription, error surfacing, reset, unsubscribe on unmount.
+    *   `rules.ts`: `DEFAULT_RULES`, the in-memory v1 allowlist.
+    *   `rules.test.ts`: Pins the defaults against the app names `get-windows` really reports on Windows.
 *   **Integration Boundaries:**
+    *   **Preload bridge:** `useFocusTracker` is the only code here that touches `window.api` (see [preload/CONTEXT.md](../../../preload/CONTEXT.md)).
     *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent` live there because they cross the main → preload → renderer boundary. Import them with `import type` only — the file sits outside vite's `root`, and only type-only imports are erased before resolution.
 
-> **Not yet wired into the app.** No sampler exists yet, so nothing feeds `FocusTracker` real samples, and nothing reads its status. The `get-windows` sampler (Milestone 2), the typed IPC channel (Milestone 3), and the renderer hook (Milestone 4) are the next planned increments.
+> **Wired in.** `WindowSampler` in the main process emits a sample every 2s over `'focus:event'`; `App.tsx` runs `useFocusTracker(DEFAULT_RULES)` and renders the result. Not yet connected to `LlmEvaluator`.
 
 > **Privacy.** `windowTitle` is personal activity data (`context.md` constraint 1). The tracker compares it in memory and never stores it; `FocusStatus` deliberately carries the app name only. Do not render, log, or persist titles.
 
@@ -23,7 +28,7 @@ It holds every rule and all the state, but never calls an OS API — samples are
 
 ## 2. Architecture & Flow
 
-Planned end-to-end flow. Grey nodes do not exist yet.
+End-to-end flow. Grey nodes do not exist yet.
 
 ```mermaid
 graph LR
@@ -31,13 +36,9 @@ graph LR
     Sampler -->|SamplerEvent over IPC| Bridge[preload contextBridge]
     Bridge --> Hook[useFocusTracker — renderer]
     Hook --> Tracker[FocusTracker — pure logic]
-    Tracker -->|FocusStatus| UI[LogConsole status line]
+    Tracker -->|FocusStatus| UI[FocusStatusPanel + LogConsole]
     Tracker -->|violationCount, distractionDuration| Llm[LlmEvaluator — stub]
 
-    style Sampler fill:#6b7280,stroke:#374151,color:#fff
-    style Bridge fill:#6b7280,stroke:#374151,color:#fff
-    style Hook fill:#6b7280,stroke:#374151,color:#fff
-    style UI fill:#6b7280,stroke:#374151,color:#fff
     style Llm fill:#6b7280,stroke:#374151,color:#fff
 ```
 
@@ -123,3 +124,20 @@ All matching is case-insensitive substring matching. That is forgiving in the us
 
 #### `reset()`
 *   **Description:** Returns every counter to the initial state, as at construction.
+
+---
+
+### `useFocusTracker(rules)` Hook
+*   **Input:** `rules: FocusRules` — read once, on first render.
+*   **Output:** `{ status: FocusStatus; error: SamplerError | null; reset: () => void }`
+*   **Description:** Subscribes on mount and unsubscribes on unmount. A `sample` event updates `status` and clears `error`; an `error` event sets `error` and leaves the last `status` in place. `reset` is stable across renders.
+
+### `DEFAULT_RULES`
+```typescript
+{
+  allowedApps: ['Visual Studio Code', 'Windows Terminal', 'Obsidian', 'Electron', 'FocusSentinel'],
+  browsers: ['Chrome', 'Edge', 'Firefox', 'Zen'],
+  allowedBrowserTitles: ['MDN', 'Stack Overflow', 'GitHub', 'localhost'],
+}
+```
+`get-windows` reports **display names** (`Google Chrome`, `Visual Studio Code`, `Microsoft Edge`), not process names (`chrome`, `Code`, `msedge`), so entries must match those. `Electron` is FocusSentinel's own window in development. In memory only — persisting the list is a deliberate exception to the zero-retention rule and needs its own decision.

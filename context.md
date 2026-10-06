@@ -11,12 +11,12 @@ FocusSentinel is a personal, local-only desktop tool built to help its one user 
 - **Electron + React shell**: window management, custom title bar — working.
 - **Local LLM evaluator** (`src/renderer/services/llm/`): WebGPU-based local inference via `@mlc-ai/web-llm`, decoupled prompt building (see ADR-007). Reusable for the next phase; the existing personas need reframing toward supportive/motivational guidance rather than punitive reprimands.
 - **TTS** (`src/renderer/services/tts/`): `WebSpeechProvider` implemented and tested.
+- **Desktop usage tracking** (`src/main/WindowSampler.ts`, `src/renderer/services/focus/`): samples the Windows foreground window every 2s via `get-windows`, judges it against an in-memory allowlist (browsers by tab title, other apps by name), and shows live focus state, distraction duration, and violation count. Runs natively on Windows. See `docs/plans/desktop-usage-tracking.md`.
 - **Camera/YOLO detection pipeline**: removed.
 - **Licensing/tiers**: removed. No monetization plan.
 
 ## What's next (not yet built)
 - A "goal" input so the user can state what they're working on and why, giving the LLM evaluator real context to be supportive rather than generic.
-- Distraction signal(s) that better match how this user actually gets distracted while working at a computer — most likely desktop/active-window usage tracking — rather than a webcam pointed at a phone.
 - Wiring the LLM evaluator and TTS into that signal end-to-end, so the core hypothesis (does a supportive AI check-in actually help) can be tested for real.
 
 ## Engineering Constraints & Rules for AI Assistants

@@ -527,6 +527,29 @@ input:checked + .slider::before {
   font-weight: bold;
 }
 
+.log-line.info {
+  color: var(--color-success);
+}
+
+.log-line.warn {
+  color: var(--color-warning);
+}
+
+/* Focus panel */
+.sampler-error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.focus-current-app {
+  margin: 16px 0;
+}
+
 /* Camera Selector Dropdown Styling */
 .camera-select-container {
   display: flex;

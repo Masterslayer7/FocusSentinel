@@ -7,15 +7,19 @@ This module manages the user interface (UI) rendering and user interactions with
 ## 1. Directory Manifest & Boundaries
 
 *   **Directory Manifest:**
-    *   `App.tsx`: Root component. Currently a minimal shell — renders `Header` and an empty `<main>` placeholder.
+    *   `App.tsx`: Root component. Runs `useFocusTracker(DEFAULT_RULES)` and renders `Header`, `FocusStatusPanel`, and `LogConsole` as a capped activity log (one line per change of app or focus state, max 100 lines).
+    *   `global.d.ts`: Declares `window.api` — the single source of truth for what preload exposes to the renderer.
     *   `components/Header.tsx`: App logo, a static status badge, and window-control buttons (minimize, maximize, close).
-    *   `components/LogConsole.tsx`: Scrollable, auto-scrolling log display with a clear-logs button. Not currently mounted by `App.tsx` — retained for the next feature increment to wire up.
-    *   `App.test.tsx`: Smoke test suite (Vitest + React Testing Library, JSDOM environment).
-    *   `setupTests.ts`: Global `window.api` mocks for the test environment.
+    *   `components/FocusStatusPanel.tsx`: Live focus state, distraction duration, violation count, current app, a visible alert when the sampler fails, and a reset button.
+    *   `components/LogConsole.tsx`: Scrollable, auto-scrolling log display with a clear-logs button. Used as the focus activity log.
+    *   `App.test.tsx`: Vitest + React Testing Library suite: header, window controls, live status, log-per-change, sampler errors, and a privacy check that no window title is ever rendered.
+    *   `setupTests.ts`: Global `window.api` mock, typed against `global.d.ts`.
 *   **Integration Boundaries:**
-    *   **Preload Context Bridge:** Calls `window.api.minimize/maximize/close`, exposed by [preload/preload.ts](file:///home/yugp/projects/FocusSentinel/src/preload/preload.ts) (see [preload/CONTEXT.md](file:///home/yugp/projects/FocusSentinel/src/preload/CONTEXT.md)).
-    *   **Local Services:** `services/llm/` and `services/tts/` exist as standalone, tested modules (see their own `CONTEXT.md` files) but are **not yet wired into `App.tsx`** — that integration is the next planned increment, not part of the current shell.
+    *   **Preload Context Bridge:** Calls `window.api.minimize/maximize/close` and subscribes via `window.api.onFocusEvent` (see [preload/CONTEXT.md](../preload/CONTEXT.md)).
+    *   **Local Services:** `services/focus/` is wired into `App.tsx` (see [services/focus/CONTEXT.md](services/focus/CONTEXT.md)). `services/llm/` and `services/tts/` are not yet wired.
 
+> **Privacy.** Nothing in the UI renders a window title — only app names and focus state. `App.test.tsx` asserts this.
+>
 > The camera/vision UI (`ControlBoard`, `TelemetryDisplay`) and the licensing UI (`PremiumGuard`, `PremiumUpsellBanner`) were removed as part of the pivot away from camera-based detection and monetization — see `docs/adr/008-retire-camera-pipeline-and-licensing.md`.
 
 ---
@@ -28,7 +32,13 @@ graph TD
     Header -->|window.api.minimize/maximize/close| Preload[Preload API Gateway]
     Preload -->|ipcRenderer.send| Main[Electron Main Process]
 
-    LLM[services/llm/LlmEvaluator] -.not yet wired.-> App[App.tsx]
+    Main -->|focus:event| Preload
+    Preload -->|window.api.onFocusEvent| Hook[useFocusTracker]
+    Hook -->|status, error, reset| App[App.tsx]
+    App --> Panel[FocusStatusPanel]
+    App -->|one line per change| Log[LogConsole]
+
+    LLM[services/llm/LlmEvaluator] -.not yet wired.-> App
     TTS[services/tts/WebSpeechProvider] -.not yet wired.-> App
 ```
 
@@ -38,7 +48,7 @@ graph TD
 
 ### Component: `App` (default export)
 *   **Props:** None.
-*   **Description:** Renders `Header` wired to `window.api`, plus an empty `<main className="app-main">` placeholder where the goal input, distraction signal, and LLM/TTS integration will land.
+*   **Description:** Owns the focus session for the window's lifetime. Appends a log line whenever `status.currentApp` or `status.isDistracted` changes — app name and state only, never a title — and keeps the last 100.
 
 ### Component: `Header`
 | Prop | Type | Required | Description |
@@ -47,14 +57,21 @@ graph TD
 | `onMaximize` | `() => void` | Yes | Called when the maximize/restore button is clicked. |
 | `onClose` | `() => void` | Yes | Called when the close button is clicked. |
 
+### Component: `FocusStatusPanel`
+| Prop | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `status` | `FocusStatus` | Yes | Current tracker status. |
+| `error` | `SamplerError \| null` | Yes | Rendered as a `role="alert"` banner when present, so a broken sampler never looks like a focused user. |
+| `onReset` | `() => void` | Yes | Called by the "Reset session" button. |
+
 ### Component: `LogConsole`
 | Prop | Type | Required | Description |
 | :--- | :--- | :---: | :--- |
-| `streamLogs` | `string[]` | Yes | Log lines to render. Each entry may be prefixed `typeClass|message` for styling; entries without a `|` render as plain text. |
+| `streamLogs` | `string[]` | Yes | Log lines to render. Each entry may be prefixed `typeClass|message` for styling (`info`, `warn`); entries without a `|` render as plain text. |
 | `onClearLogs` | `() => void` | Yes | Called when the "Clear Logs" button is clicked. |
 
 ---
 
 ## 4. Testing
-* **`App.test.tsx`**: Confirms the header renders and that its window-control buttons call `window.api.minimize/maximize/close`.
-* **`setupTests.ts`**: Stubs `window.api` with `vi.fn()` mocks for `minimize`, `maximize`, and `close`.
+* **`App.test.tsx`**: Header and window controls; live status from emitted samples; one log line per change rather than per sample; sampler errors shown as an alert; no window title anywhere in the rendered DOM.
+* **`setupTests.ts`**: Stubs `window.api` with `vi.fn()` mocks for `onFocusEvent`, `minimize`, `maximize`, and `close`. Tests that need to emit focus events override `onFocusEvent` to capture the callback.

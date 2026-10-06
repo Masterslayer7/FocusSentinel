@@ -1,6 +1,6 @@
-import type { WindowSample } from '../../../shared/types';
+import type { SamplerError, SamplerEvent, WindowSample } from '../../../shared/types';
 
-export type { WindowSample };
+export type { SamplerError, SamplerEvent, WindowSample };
 
 /** What the tracker answers with. Deliberately free of window titles. */
 export interface FocusStatus {

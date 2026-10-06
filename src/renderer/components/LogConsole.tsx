@@ -18,7 +18,7 @@ export const LogConsole: React.FC<LogConsoleProps> = ({ streamLogs, onClearLogs 
   return (
     <div className="log-console">
       <div className="console-header">
-        <span>Raw JSON Stream Packet Console</span>
+        <span>Focus Activity Log</span>
         <button id="btn-clear" className="btn-clear" onClick={onClearLogs}>Clear Logs</button>
       </div>
       <div className="console-body" id="log-body" ref={logConsoleRef}>
