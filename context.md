@@ -21,8 +21,9 @@ FocusSentinel is a personal, local-only desktop tool built to help its one user 
 
 ## Engineering Constraints & Rules for AI Assistants
 
-1. **Zero-Data Retention:**
-   * Never persist screen contents, audio, or other personal activity data to disk. Keep everything in memory for the duration of a session.
+1. **Minimal, Local Data Retention** (amended by ADR-009):
+   * Only what `docs/adr/009-persist-session-settings-and-app-usage-locally.md` lists may be saved: goals, settings, per-app rules, and per-app usage time, in one local JSON file written by the main process.
+   * Never persist window titles, screen contents, audio, or anything not on that list. Window titles are compared in memory and dropped.
    * No external telemetry, crash reporting, or analytics.
 
 2. **Local-First:**
