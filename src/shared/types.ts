@@ -33,6 +33,14 @@ export interface FocusRules {
   allowedBrowserTitles: string[];
 }
 
+/** Pomodoro lengths. Persisted (ADR-009). */
+export interface PomodoroSettings {
+  focusMinutes: number;
+  shortBreakMinutes: number;
+  longBreakMinutes: number;
+  longBreakEvery: number; // a long break follows every Nth completed focus block
+}
+
 /** Why the sampler cannot currently report samples. */
 export interface SamplerError {
   reason: 'addon-unavailable' | 'query-failed';
