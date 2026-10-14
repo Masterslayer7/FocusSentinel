@@ -10,6 +10,7 @@ export const DEFAULT_STATE: PersistedState = {
   pomodoro: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4 },
   modelId: null,
   appUsage: {},
+  speech: { enabled: true, engine: 'system', voiceId: null },
 };
 
 export const isPreset = (persona: string): persona is LlmPreset =>
@@ -60,6 +61,8 @@ export function appStateReducer(state: PersistedState, action: AppStateAction): 
       return { ...state, pomodoro: action.settings };
     case 'setModel':
       return { ...state, modelId: action.modelId };
+    case 'setSpeech':
+      return { ...state, speech: action.settings };
 
     case 'creditUsage': {
       const previous = state.appUsage[action.appName];

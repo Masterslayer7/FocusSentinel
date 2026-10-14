@@ -847,6 +847,19 @@ input:checked + .slider::before {
   gap: 10px;
 }
 
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-main);
+  cursor: pointer;
+}
+
+.toggle-row input {
+  accent-color: var(--color-primary);
+}
+
 .inline-form .input,
 .inline-form .select {
   flex: 1;

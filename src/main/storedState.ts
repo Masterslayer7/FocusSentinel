@@ -4,7 +4,9 @@ import type {
   FocusRules,
   Goal,
   PomodoroSettings,
+  SpeechSettings,
   StoredState,
+  TtsEngine,
 } from '../shared/types';
 
 // Validates whatever came off disk (or over IPC) into a StoredState. Each field
@@ -22,6 +24,7 @@ const safeEntries = (record: Json): [string, unknown][] =>
   Object.entries(record).filter(([key]) => !UNSAFE_KEYS.has(key));
 
 const CATEGORIES: readonly AppCategory[] = ['focus', 'distraction', 'browser'];
+const ENGINES: readonly TtsEngine[] = ['system', 'kokoro'];
 
 const isWholeNumberIn = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
@@ -82,6 +85,19 @@ const parseAppUsage = (value: unknown): Record<string, AppUsageEntry> | undefine
   return usage;
 };
 
+const parseSpeech = (value: unknown): SpeechSettings | undefined => {
+  if (!isObject(value)) return undefined;
+  const { enabled, engine, voiceId } = value;
+  if (
+    typeof enabled === 'boolean' &&
+    ENGINES.includes(engine as TtsEngine) &&
+    (typeof voiceId === 'string' || voiceId === null)
+  ) {
+    return { enabled, engine: engine as TtsEngine, voiceId };
+  }
+  return undefined;
+};
+
 export function parseStoredState(raw: unknown): StoredState {
   if (!isObject(raw)) return {};
 
@@ -96,5 +112,7 @@ export function parseStoredState(raw: unknown): StoredState {
   if (typeof raw.modelId === 'string' || raw.modelId === null) state.modelId = raw.modelId;
   const appUsage = parseAppUsage(raw.appUsage);
   if (appUsage) state.appUsage = appUsage;
+  const speech = parseSpeech(raw.speech);
+  if (speech) state.speech = speech;
   return state;
 }

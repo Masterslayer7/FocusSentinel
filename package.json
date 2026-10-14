@@ -34,6 +34,7 @@
   "dependencies": {
     "@mlc-ai/web-llm": "^0.2.84",
     "get-windows": "^9.3.0",
+    "kokoro-js": "^1.2.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
@@ -58,6 +59,16 @@
       "!node_modules/react/**",
       "!node_modules/react-dom/**",
       "!node_modules/scheduler/**",
+      "!node_modules/kokoro-js/**",
+      "!node_modules/@huggingface/**",
+      "!node_modules/onnxruntime-common/**",
+      "!node_modules/onnxruntime-node/**",
+      "!node_modules/onnxruntime-web/**",
+      "!node_modules/phonemizer/**",
+      "!node_modules/sharp/**",
+      "!node_modules/@img/**",
+      "!node_modules/protobufjs/**",
+      "!node_modules/@protobufjs/**",
       "!node_modules/get-windows/lib/binding/*darwin*/**",
       "!node_modules/get-windows/main"
     ],

@@ -2,7 +2,7 @@
 export interface TtsVoice {
   id: string;
   name: string;
-  provider: 'webspeech' | 'cloud' | 'piper';
+  provider: 'webspeech' | 'kokoro' | 'cloud' | 'piper';
 }
 
 export interface ITtsProvider {
@@ -14,4 +14,13 @@ export interface ITtsProvider {
   
   /** Convert text to audio and play it to completion */
   speak(text: string, voiceId: string, options?: { pitch?: number; rate?: number }): Promise<void>;
+
+  /** Cut off whatever is speaking now. Safe to call when nothing is. */
+  stop(): void;
+
+  /**
+   * Call listener whenever the installed voices change; returns an unsubscribe.
+   * Windows can take seconds to report its voices after the app starts.
+   */
+  onVoicesChanged(listener: () => void): () => void;
 }

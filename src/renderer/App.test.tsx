@@ -1,8 +1,11 @@
 import { render, screen, fireEvent, act, within } from '@testing-library/react';
-import { vi, describe, test, expect, beforeEach } from 'vitest';
+import { vi, describe, test, expect, beforeEach, afterEach } from 'vitest';
 import React from 'react';
 import App from './App';
 import type { SamplerEvent, StoredState } from '../shared/types';
+
+// Kokoro's real loader would download a model; these tests only need its voice list.
+vi.mock('./services/tts/loadKokoro', () => ({ loadKokoro: vi.fn(async () => ({ generate: vi.fn() })) }));
 
 describe('FocusSentinel App React UI', () => {
   // Several hooks subscribe (tracker, usage); deliver to all, as preload does.
@@ -145,6 +148,93 @@ describe('FocusSentinel App React UI', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe('spoken check-ins', () => {
+    const DAVID = 'Microsoft David - English (United States)';
+    const ZIRA = 'Microsoft Zira - English (United States)';
+    let spoken: { text: string; voice: { name: string } | null }[];
+
+    beforeEach(() => {
+      spoken = [];
+      vi.stubGlobal('speechSynthesis', {
+        getVoices: () => [DAVID, ZIRA].map((name) => ({ name, lang: 'en-US' })),
+        speak: vi.fn((utterance) => spoken.push(utterance)),
+        cancel: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        onvoiceschanged: null,
+      });
+      vi.stubGlobal(
+        'SpeechSynthesisUtterance',
+        class {
+          voice = null;
+          constructor(public text: string) {}
+        },
+      );
+    });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    test('the Coach tab can mute check-ins and pick a voice, and both are saved', async () => {
+      vi.useFakeTimers();
+      try {
+        await renderApp();
+        openTab('Coach');
+
+        const toggle = screen.getByLabelText('Speak check-ins') as HTMLInputElement;
+        expect(toggle.checked).toBe(true);
+        fireEvent.click(toggle);
+        fireEvent.change(screen.getByLabelText('Voice'), { target: { value: ZIRA } });
+        await act(async () => vi.advanceTimersByTime(1000));
+
+        expect(vi.mocked(window.api.saveState).mock.calls.at(-1)?.[0].speech).toEqual({
+          enabled: false,
+          engine: 'system',
+          voiceId: ZIRA,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    test('switching to Kokoro lists its voices and saves the engine, back on Automatic', async () => {
+      vi.useFakeTimers();
+      try {
+        await renderApp({ speech: { enabled: true, engine: 'system', voiceId: ZIRA } });
+        openTab('Coach');
+
+        fireEvent.change(screen.getByLabelText('Voice engine'), { target: { value: 'kokoro' } });
+        await act(async () => vi.advanceTimersByTime(1000));
+
+        expect(screen.getByRole('option', { name: 'Fenrir (US male, deep)' })).toBeDefined();
+        expect(vi.mocked(window.api.saveState).mock.calls.at(-1)?.[0].speech).toEqual({
+          enabled: true,
+          engine: 'kokoro',
+          voiceId: null,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    test("Try voice speaks the persona's sample line in its voice", async () => {
+      await renderApp({ persona: 'Drill Sergeant' });
+      openTab('Coach');
+
+      await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Try voice' })));
+
+      expect(spoken).toHaveLength(1);
+      expect(spoken[0].voice?.name).toBe(DAVID);
+    });
+
+    test('with no voices installed the picker says check-ins will not be spoken', async () => {
+      vi.stubGlobal('speechSynthesis', undefined);
+      await renderApp();
+      openTab('Coach');
+
+      expect(screen.getByText(/No voices found/)).toBeDefined();
+    });
   });
 
   test('a sustained distraction triggers a check-in; an unloaded model is reported, not fatal', async () => {

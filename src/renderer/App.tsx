@@ -16,6 +16,11 @@ import { useAppState } from './services/session/useAppState';
 import { isPreset } from './services/session/appState';
 import { useLlmModel } from './services/llm/useLlmModel';
 import llmEvaluator from './services/llm/LlmEvaluator';
+import { useSpeakCheckIns } from './services/tts/useSpeakCheckIns';
+import { WebSpeechProvider } from './services/tts/WebSpeechProvider';
+import { KokoroProvider } from './services/tts/KokoroProvider';
+import type { ITtsProvider } from './services/tts/types';
+import type { TtsEngine } from './services/session/types';
 
 // A long session would otherwise grow these lists without bound.
 const MAX_LOG_LINES = 100;
@@ -25,6 +30,11 @@ const TABS = ['Goals', 'Apps', 'Coach', 'Log'] as const;
 type Tab = (typeof TABS)[number];
 
 const now = () => new Date().toLocaleTimeString();
+
+const TTS_ENGINES: Record<TtsEngine, ITtsProvider> = {
+  system: new WebSpeechProvider(),
+  kokoro: new KokoroProvider(),
+};
 
 export default function App() {
   const { state, dispatch, isLoaded, storageError } = useAppState();
@@ -53,11 +63,13 @@ export default function App() {
     () => state.goals.filter((goal) => !goal.done).map((goal) => goal.text),
     [state.goals],
   );
+  const preset = isPreset(state.persona) ? state.persona : 'Supportive Mentor';
   const checkIn = useFocusCheckIn(status, llmEvaluator, {
-    preset: isPreset(state.persona) ? state.persona : 'Supportive Mentor',
+    preset,
     goals: openGoals,
     timeRemainingSeconds: pomodoro.status.remainingSeconds,
   });
+  const speech = useSpeakCheckIns(checkIn, TTS_ENGINES[state.speech.engine], { ...state.speech, preset });
 
   // One line per change of app or focus state, not one per 2s sample.
   // App name and state only — never a window title.
@@ -76,7 +88,7 @@ export default function App() {
     );
   }, [pomodoro.status.isFocusActive]);
 
-  // Each check-in lands in the Coach tab and the log. Not yet spoken aloud.
+  // Each check-in lands in the Coach tab and the log. Replies are also spoken (useSpeakCheckIns).
   useEffect(() => {
     if (!checkIn) return;
     setCheckIns((previous) =>
@@ -149,6 +161,10 @@ export default function App() {
               modelId={state.modelId}
               modelStatus={model.status}
               onLoadModel={loadModel}
+              speech={state.speech}
+              onSpeechChange={(settings) => dispatch({ type: 'setSpeech', settings })}
+              voices={speech.voices}
+              onPreviewVoice={speech.preview}
               checkIns={checkIns}
             />
           )}

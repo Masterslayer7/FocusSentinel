@@ -4,10 +4,21 @@ import type {
   Goal,
   PersistedState,
   PomodoroSettings,
+  SpeechSettings,
   StoredState,
+  TtsEngine,
 } from '../../../shared/types';
 
-export type { AppCategory, AppUsageEntry, Goal, PersistedState, PomodoroSettings, StoredState };
+export type {
+  AppCategory,
+  AppUsageEntry,
+  Goal,
+  PersistedState,
+  PomodoroSettings,
+  SpeechSettings,
+  StoredState,
+  TtsEngine,
+};
 
 export type AppStateAction =
   | { type: 'loaded'; stored: StoredState }
@@ -20,5 +31,6 @@ export type AppStateAction =
   | { type: 'setPersona'; persona: string }
   | { type: 'setPomodoro'; settings: PomodoroSettings }
   | { type: 'setModel'; modelId: string | null }
+  | { type: 'setSpeech'; settings: SpeechSettings }
   | { type: 'creditUsage'; appName: string; ms: number; at: number }
   | { type: 'clearUsage' };

@@ -1,6 +1,6 @@
 # Session State Subsystem
 
-The renderer's single source of truth for everything the user sets up and everything that is saved (ADR-009): goals, per-app rules, allowed browser titles, persona, Pomodoro lengths, chosen model, and per-app usage time. One reducer, one hook, loaded once and saved automatically.
+The renderer's single source of truth for everything the user sets up and everything that is saved (ADR-009): goals, per-app rules, allowed browser titles, persona, Pomodoro lengths, chosen model, spoken check-in settings, and per-app usage time. One reducer, one hook, loaded once and saved automatically.
 
 ---
 
@@ -58,6 +58,6 @@ sequenceDiagram
 | `setAppCategory { appName, category }` | Set one app's rule (exact name). |
 | `setBrowserTitles { titles }` | Replace allowed browser-title keywords; blanks and duplicates dropped. |
 | `setPersona { persona }` | Ignored unless it is a known preset. |
-| `setPomodoro { settings }`, `setModel { modelId }` | Replace. |
+| `setPomodoro { settings }`, `setModel { modelId }`, `setSpeech { settings }` | Replace. |
 | `creditUsage { appName, ms, at }` | Add `ms` to the app's total seconds; set `lastSeen`. |
 | `clearUsage` | Empty the usage history. |
