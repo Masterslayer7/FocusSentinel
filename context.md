@@ -10,14 +10,14 @@ FocusSentinel is a personal, local-only desktop tool built to help its one user 
 ## Where things stand
 - **Electron + React shell**: window management, custom title bar — working.
 - **Local LLM evaluator** (`src/renderer/services/llm/`): WebGPU-based local inference via `@mlc-ai/web-llm`, decoupled prompt building (see ADR-007). Reusable for the next phase; the existing personas need reframing toward supportive/motivational guidance rather than punitive reprimands.
-- **TTS** (`src/renderer/services/tts/`): `WebSpeechProvider` implemented and tested.
+- **TTS** (`src/renderer/services/tts/`): replied check-ins are spoken aloud through the system's offline voices (`WebSpeechProvider`), each persona with its own voice, speed and pitch. A mute switch and a voice picker on the Coach tab are saved with the other settings.
 - **Session tools** (`src/renderer/services/{session,pomodoro}/`, `src/main/StateStore.ts`): a goal list, a Pomodoro timer (distractions count only during focus blocks), a per-app list with time spent and a focus/distraction/browser choice for each, a personality picker, and model loading. Goals, rules, settings and app usage are saved locally (ADR-009). Check-ins call the real model with the goals, time left, persona and distracting app.
 - **Desktop usage tracking** (`src/main/WindowSampler.ts`, `src/renderer/services/focus/`): samples the Windows foreground window every 2s via `get-windows`, judges it against an in-memory allowlist (browsers by tab title, other apps by name), and shows live focus state, distraction duration, and violation count. Runs natively on Windows. See `docs/plans/desktop-usage-tracking.md`.
 - **Camera/YOLO detection pipeline**: removed.
 - **Licensing/tiers**: removed. No monetization plan.
 
 ## What's next (not yet built)
-- Speaking check-ins aloud: pipe `useFocusCheckIn` replies into `WebSpeechProvider` (`src/renderer/services/tts/`).
+- Better voices: Windows' stock SAPI voices are robotic. A bundled neural voice (e.g. Piper) behind `ITtsProvider` is the likely next step; cloud TTS stays out (constraint 2).
 - Real-use tuning: whether 6 seconds and no grace period feel right, and whether the 2-minute cooldown is too quiet or too chatty.
 - Testing the core hypothesis for real: does a goal-aware check-in actually bring the user back?
 

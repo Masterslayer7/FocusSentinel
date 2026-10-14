@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { LLM_PRESETS } from '../services/llm/PromptBuilder';
 import { MODEL_CHOICES } from '../services/llm/useLlmModel';
 import type { LlmStatusUpdate } from '../services/llm/LlmEvaluator';
+import type { TtsVoice } from '../services/tts/types';
+import type { SpeechSettings } from '../services/session/types';
 
 export interface CheckInEntry {
   id: number;
@@ -16,6 +18,10 @@ interface CoachPanelProps {
   modelId: string | null;
   modelStatus: LlmStatusUpdate;
   onLoadModel: (modelId: string) => void;
+  speech: SpeechSettings;
+  onSpeechChange: (speech: SpeechSettings) => void;
+  voices: TtsVoice[];
+  onPreviewVoice: () => void;
   checkIns: CheckInEntry[];
 }
 
@@ -34,10 +40,16 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
   modelId,
   modelStatus,
   onLoadModel,
+  speech,
+  onSpeechChange,
+  voices,
+  onPreviewVoice,
   checkIns,
 }) => {
   const [selectedModel, setSelectedModel] = useState(modelId ?? MODEL_CHOICES[0].id);
   const isBusy = BUSY_STATES.has(modelStatus.state);
+  // A saved voice that has since been uninstalled shows as Automatic, which is what speaks.
+  const voiceValue = speech.voiceId && voices.some((voice) => voice.id === speech.voiceId) ? speech.voiceId : '';
 
   return (
     <div className="panel-stack">
@@ -49,6 +61,40 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
           ))}
         </select>
         <span className="field-hint">{PERSONA_NOTES[persona]}</span>
+      </div>
+
+      <div className="field">
+        <label className="field-label" htmlFor="voice">Voice</label>
+        <label className="toggle-row">
+          <input
+            type="checkbox"
+            checked={speech.enabled}
+            onChange={(event) => onSpeechChange({ ...speech, enabled: event.target.checked })}
+          />
+          Speak check-ins
+        </label>
+        <div className="inline-form">
+          <select
+            id="voice"
+            className="select"
+            value={voiceValue}
+            disabled={voices.length === 0}
+            onChange={(event) => onSpeechChange({ ...speech, voiceId: event.target.value || null })}
+          >
+            <option value="">Automatic (matches the personality)</option>
+            {voices.map((voice) => (
+              <option key={voice.id} value={voice.id}>{voice.name}</option>
+            ))}
+          </select>
+          <button className="btn btn-secondary btn-compact" disabled={voices.length === 0} onClick={onPreviewVoice}>
+            Try voice
+          </button>
+        </div>
+        <span className="field-hint">
+          {voices.length === 0
+            ? 'No voices found on this system, so check-ins are shown but not spoken.'
+            : 'Uses the voices built into your system, offline. Automatic gives each personality its own voice, speed and pitch.'}
+        </span>
       </div>
 
       <div className="field">

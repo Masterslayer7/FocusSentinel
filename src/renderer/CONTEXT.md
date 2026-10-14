@@ -15,14 +15,14 @@ This module manages the user interface (UI) rendering and user interactions with
     *   `components/Tabs.tsx`: Accessible tab list (arrow keys move between tabs).
     *   `components/GoalsPanel.tsx`: Add, tick off, remove and clear goals.
     *   `components/AppsPanel.tsx`: Every app used, sorted by time, each with a "counts as" select (focus / distraction / browser: judge by tab); allowed tab keywords; two-step "clear usage history".
-    *   `components/CoachPanel.tsx`: Personality picker, model picker with Load and progress, and the list of check-ins (newest first, in memory only).
+    *   `components/CoachPanel.tsx`: Personality picker, "Speak check-ins" switch with a voice picker and "Try voice", model picker with Load and progress, and the list of check-ins (newest first, in memory only).
     *   `components/LogConsole.tsx`: The activity log, in the Log tab.
     *   `components/format.ts`: `formatDuration` ("2m 5s") and `formatClock` ("24:30").
     *   `App.test.tsx`, `components/format.test.ts`: UI tests against the real hooks with `window.api` mocked.
     *   `setupTests.ts`: Global `window.api` mock, typed against `global.d.ts`; skipped in Node-environment tests.
 *   **Integration Boundaries:**
     *   **Preload Context Bridge:** window controls, `onFocusEvent`, `loadState`/`saveState` (see [preload/CONTEXT.md](../preload/CONTEXT.md)).
-    *   **Local Services:** `services/focus/`, `services/pomodoro/`, `services/session/`, `services/llm/`, each with its own `CONTEXT.md`. `services/tts/` is not yet wired.
+    *   **Local Services:** `services/focus/`, `services/pomodoro/`, `services/session/`, `services/llm/`, `services/tts/`, each with its own `CONTEXT.md`.
 
 > **Privacy.** Nothing in the UI renders a window title — only app names and focus state. `App.test.tsx` asserts this.
 >
@@ -34,7 +34,7 @@ This module manages the user interface (UI) rendering and user interactions with
 
 ```mermaid
 graph TD
-    State[useAppState: goals, rules, persona, timer lengths, model, usage] -->|loadState / saveState| Preload[Preload]
+    State[useAppState: goals, rules, persona, timer lengths, model, speech, usage] -->|loadState / saveState| Preload[Preload]
     State --> App[App.tsx]
     App --> Timer[usePomodoro]
     Timer -->|isFocusActive| Tracker[useFocusTracker]
@@ -45,6 +45,9 @@ graph TD
     Timer -->|remainingSeconds| CheckIn
     State -->|persona, unfinished goals| CheckIn
     CheckIn -->|evaluate| LLM[LlmEvaluator]
+    CheckIn -->|CheckIn| Speak[useSpeakCheckIns]
+    State -->|speech settings, persona| Speak
+    Speak -->|speak| TTS[WebSpeechProvider]
     Model[useLlmModel] -->|initialize| LLM
     App --> Panels[Timer, Focus, Goals, Apps, Coach, Log]
 ```
@@ -57,10 +60,10 @@ Components are presentational: props in, callbacks out. Only `App` and the hooks
 
 ### Component: `App` (default export)
 *   **Props:** None.
-*   **Description:** Logs one line per change of app or focus state, per focus-block start/stop, and per check-in (max 100). Keeps the last 50 check-ins for the Coach tab. Choosing a model and pressing Load saves the choice and loads it.
+*   **Description:** Logs one line per change of app or focus state, per focus-block start/stop, and per check-in (max 100). Keeps the last 50 check-ins for the Coach tab and speaks replies through one module-level `WebSpeechProvider`. Choosing a model and pressing Load saves the choice and loads it.
 
 ---
 
 ## 4. Testing
-* **`App.test.tsx`**: distractions ignored until a focus block starts; live status during a block; timer start/pause; goals add/tick/remove; saved goals, persona and usage shown after load; changing an app to focus on the Apps tab stops it counting; changes saved after 1s; a check-in failure reported in the Coach tab without stopping tracking; no window title on any tab; sampler errors shown as an alert.
+* **`App.test.tsx`**: distractions ignored until a focus block starts; live status during a block; timer start/pause; goals add/tick/remove; saved goals, persona and usage shown after load; changing an app to focus on the Apps tab stops it counting; changes saved after 1s; a check-in failure reported in the Coach tab without stopping tracking; no window title on any tab; sampler errors shown as an alert; the speak switch and voice choice saved; "Try voice" speaks in the persona's voice; a no-voices hint.
 * The focus-event mock delivers to every subscriber, as preload does, because two hooks subscribe.

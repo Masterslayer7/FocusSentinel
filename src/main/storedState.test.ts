@@ -9,6 +9,7 @@ const VALID = {
   pomodoro: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4 },
   modelId: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC',
   appUsage: { Discord: { seconds: 120, lastSeen: 1_700_000_000_000 } },
+  speech: { enabled: true, voiceId: 'Microsoft David - English (United States)' },
 };
 
 describe('parseStoredState', () => {
@@ -29,6 +30,7 @@ describe('parseStoredState', () => {
       rules: VALID.rules,
       modelId: VALID.modelId,
       appUsage: VALID.appUsage,
+      speech: VALID.speech,
     });
   });
 
@@ -52,6 +54,13 @@ describe('parseStoredState', () => {
 
   test('modelId may be null, meaning no model chosen yet', () => {
     expect(parseStoredState({ modelId: null })).toEqual({ modelId: null });
+  });
+
+  test('speech settings need a boolean switch and a voice name or null', () => {
+    expect(parseStoredState({ speech: { enabled: false, voiceId: null } })).toEqual({ speech: { enabled: false, voiceId: null } });
+    expect(parseStoredState({ speech: { enabled: 'yes', voiceId: null } }).speech).toBeUndefined();
+    expect(parseStoredState({ speech: { enabled: true, voiceId: 7 } }).speech).toBeUndefined();
+    expect(parseStoredState({ speech: { enabled: true, voiceId: null, volume: 11 } }).speech).toEqual({ enabled: true, voiceId: null });
   });
 
   test('fields it does not know about are not carried through', () => {

@@ -25,7 +25,7 @@ It holds every rule and all the state, but never calls an OS API — samples are
     *   **Preload bridge:** `useFocusTracker` is the only code here that touches `window.api` (see [preload/CONTEXT.md](../../../preload/CONTEXT.md)).
     *   **`src/shared/types.ts`:** `WindowSample` and `SamplerEvent` live there because they cross the main → preload → renderer boundary. Import them with `import type` only — the file sits outside vite's `root`, and only type-only imports are erased before resolution.
 
-> **Wired in.** `WindowSampler` in the main process emits a sample every 2s over `'focus:event'`; `App.tsx` runs `useFocusTracker(DEFAULT_RULES)` and renders the result. `App.tsx` also runs `useFocusCheckIn(status, llmEvaluator)` and logs each check-in; replies are not yet spoken.
+> **Wired in.** `WindowSampler` in the main process emits a sample every 2s over `'focus:event'`; `App.tsx` runs `useFocusTracker(DEFAULT_RULES)` and renders the result. `App.tsx` also runs `useFocusCheckIn(status, llmEvaluator)` and logs each check-in; `useSpeakCheckIns` (`services/tts/`) speaks the replies.
 
 > **Privacy.** `windowTitle` is compared in memory and never stored, rendered, logged, or saved (ADR-009). `FocusStatus`, `UsageCredit` and the check-in context carry app names only.
 
@@ -33,7 +33,7 @@ It holds every rule and all the state, but never calls an OS API — samples are
 
 ## 2. Architecture & Flow
 
-End-to-end flow. Grey nodes do not exist yet.
+End-to-end flow.
 
 ```mermaid
 graph LR
@@ -43,10 +43,8 @@ graph LR
     Hook --> Tracker[FocusTracker — pure logic]
     Tracker -->|FocusStatus| UI[FocusStatusPanel + LogConsole]
     Tracker -->|FocusStatus| CheckIn[useFocusCheckIn — once per episode]
-    CheckIn -->|evaluate 'Supportive Mentor'| Llm[LlmEvaluator — stubbed reply]
-    Llm -.not yet wired.-> TTS[WebSpeechProvider]
-
-    style TTS fill:#6b7280,stroke:#374151,color:#fff
+    CheckIn -->|evaluate persona, goals, time left| Llm[LlmEvaluator]
+    Llm -->|CheckIn replied| TTS[useSpeakCheckIns → WebSpeechProvider]
 
 ```
 

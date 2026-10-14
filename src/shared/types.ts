@@ -54,6 +54,12 @@ export interface AppUsageEntry {
   lastSeen: number; // ms since epoch
 }
 
+/** Whether check-ins are spoken aloud, and in which voice. Persisted (ADR-009). */
+export interface SpeechSettings {
+  enabled: boolean;
+  voiceId: string | null; // a system voice name; null picks one per persona
+}
+
 /**
  * Everything saved to disk (ADR-009). Deliberately has no field that could
  * hold a window title.
@@ -65,6 +71,7 @@ export interface PersistedState {
   pomodoro: PomodoroSettings;
   modelId: string | null;
   appUsage: Record<string, AppUsageEntry>;
+  speech: SpeechSettings;
 }
 
 /**

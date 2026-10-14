@@ -85,6 +85,15 @@ describe('appStateReducer', () => {
     expect(state.modelId).toBe('Qwen2.5-0.5B-Instruct-q4f16_1-MLC');
   });
 
+  test('speaking check-ins is on by default, with the voice picked per persona', () => {
+    expect(DEFAULT_STATE.speech).toEqual({ enabled: true, voiceId: null });
+  });
+
+  test('sets the speech settings', () => {
+    const speech = { enabled: false, voiceId: 'Microsoft Zira - English (United States)' };
+    expect(reduce(DEFAULT_STATE, { type: 'setSpeech', settings: speech }).speech).toEqual(speech);
+  });
+
   test('credits usage time to an app, accumulating seconds and updating lastSeen', () => {
     const state = reduce(
       DEFAULT_STATE,

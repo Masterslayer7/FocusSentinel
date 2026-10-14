@@ -13,6 +13,7 @@ const STATE: PersistedState = {
   pomodoro: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4 },
   modelId: null,
   appUsage: { Discord: { seconds: 12, lastSeen: 1_700_000_000_000 } },
+  speech: { enabled: true, voiceId: null },
 };
 
 describe('StateStore', () => {

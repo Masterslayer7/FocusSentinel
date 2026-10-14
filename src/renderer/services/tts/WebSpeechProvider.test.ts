@@ -18,6 +18,13 @@ describe('WebSpeechProvider', () => {
         }, 10);
       }),
       onvoiceschanged: null,
+      voicesChangedListeners: new Set<() => void>(),
+      addEventListener: vi.fn((type: string, listener: () => void) => {
+        if (type === 'voiceschanged') mockSpeechSynthesis.voicesChangedListeners.add(listener);
+      }),
+      removeEventListener: vi.fn((type: string, listener: () => void) => {
+        if (type === 'voiceschanged') mockSpeechSynthesis.voicesChangedListeners.delete(listener);
+      }),
     };
 
     class MockSpeechSynthesisUtterance {
@@ -118,6 +125,34 @@ describe('WebSpeechProvider', () => {
     expect(mockUtteranceInstance.voice).toEqual({ name: 'Alex', lang: 'en-US' });
 
     await speakPromise;
+  });
+
+  test('onVoicesChanged reports each change to the voice list until unsubscribed', () => {
+    const listener = vi.fn();
+    const unsubscribe = new WebSpeechProvider().onVoicesChanged(listener);
+
+    mockSpeechSynthesis.voicesChangedListeners.forEach((fire: () => void) => fire());
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+    mockSpeechSynthesis.voicesChangedListeners.forEach((fire: () => void) => fire());
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test('onVoicesChanged is a no-op when speech synthesis is not supported', () => {
+    vi.stubGlobal('speechSynthesis', undefined);
+    const unsubscribe = new WebSpeechProvider().onVoicesChanged(vi.fn());
+    expect(() => unsubscribe()).not.toThrow();
+  });
+
+  test('stop cancels whatever is speaking', () => {
+    new WebSpeechProvider().stop();
+    expect(mockSpeechSynthesis.cancel).toHaveBeenCalledTimes(1);
+  });
+
+  test('stop does nothing when speech synthesis is not supported', () => {
+    vi.stubGlobal('speechSynthesis', undefined);
+    expect(() => new WebSpeechProvider().stop()).not.toThrow();
   });
 
   test('should reject speak on error', async () => {

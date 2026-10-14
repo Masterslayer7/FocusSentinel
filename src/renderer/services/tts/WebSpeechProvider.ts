@@ -63,6 +63,19 @@ export class WebSpeechProvider implements ITtsProvider {
     });
   }
 
+  public onVoicesChanged(listener: () => void): () => void {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return () => {};
+    // An event listener, not onvoiceschanged, which getAvailableVoices() takes over.
+    const synth = window.speechSynthesis;
+    synth.addEventListener('voiceschanged', listener);
+    return () => synth.removeEventListener('voiceschanged', listener);
+  }
+
+  public stop(): void {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+  }
+
   public async speak(
     text: string,
     voiceId: string,

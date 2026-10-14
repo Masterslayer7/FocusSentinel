@@ -4,6 +4,7 @@ import type {
   FocusRules,
   Goal,
   PomodoroSettings,
+  SpeechSettings,
   StoredState,
 } from '../shared/types';
 
@@ -82,6 +83,15 @@ const parseAppUsage = (value: unknown): Record<string, AppUsageEntry> | undefine
   return usage;
 };
 
+const parseSpeech = (value: unknown): SpeechSettings | undefined => {
+  if (!isObject(value)) return undefined;
+  const { enabled, voiceId } = value;
+  if (typeof enabled === 'boolean' && (typeof voiceId === 'string' || voiceId === null)) {
+    return { enabled, voiceId };
+  }
+  return undefined;
+};
+
 export function parseStoredState(raw: unknown): StoredState {
   if (!isObject(raw)) return {};
 
@@ -96,5 +106,7 @@ export function parseStoredState(raw: unknown): StoredState {
   if (typeof raw.modelId === 'string' || raw.modelId === null) state.modelId = raw.modelId;
   const appUsage = parseAppUsage(raw.appUsage);
   if (appUsage) state.appUsage = appUsage;
+  const speech = parseSpeech(raw.speech);
+  if (speech) state.speech = speech;
   return state;
 }
