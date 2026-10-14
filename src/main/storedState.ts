@@ -6,6 +6,7 @@ import type {
   PomodoroSettings,
   SpeechSettings,
   StoredState,
+  TtsEngine,
 } from '../shared/types';
 
 // Validates whatever came off disk (or over IPC) into a StoredState. Each field
@@ -23,6 +24,7 @@ const safeEntries = (record: Json): [string, unknown][] =>
   Object.entries(record).filter(([key]) => !UNSAFE_KEYS.has(key));
 
 const CATEGORIES: readonly AppCategory[] = ['focus', 'distraction', 'browser'];
+const ENGINES: readonly TtsEngine[] = ['system', 'kokoro'];
 
 const isWholeNumberIn = (value: unknown, min: number, max: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max;
@@ -85,9 +87,13 @@ const parseAppUsage = (value: unknown): Record<string, AppUsageEntry> | undefine
 
 const parseSpeech = (value: unknown): SpeechSettings | undefined => {
   if (!isObject(value)) return undefined;
-  const { enabled, voiceId } = value;
-  if (typeof enabled === 'boolean' && (typeof voiceId === 'string' || voiceId === null)) {
-    return { enabled, voiceId };
+  const { enabled, engine, voiceId } = value;
+  if (
+    typeof enabled === 'boolean' &&
+    ENGINES.includes(engine as TtsEngine) &&
+    (typeof voiceId === 'string' || voiceId === null)
+  ) {
+    return { enabled, engine: engine as TtsEngine, voiceId };
   }
   return undefined;
 };

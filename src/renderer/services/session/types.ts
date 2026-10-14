@@ -6,9 +6,19 @@ import type {
   PomodoroSettings,
   SpeechSettings,
   StoredState,
+  TtsEngine,
 } from '../../../shared/types';
 
-export type { AppCategory, AppUsageEntry, Goal, PersistedState, PomodoroSettings, SpeechSettings, StoredState };
+export type {
+  AppCategory,
+  AppUsageEntry,
+  Goal,
+  PersistedState,
+  PomodoroSettings,
+  SpeechSettings,
+  StoredState,
+  TtsEngine,
+};
 
 export type AppStateAction =
   | { type: 'loaded'; stored: StoredState }

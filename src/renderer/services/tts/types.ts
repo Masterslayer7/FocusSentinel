@@ -2,7 +2,7 @@
 export interface TtsVoice {
   id: string;
   name: string;
-  provider: 'webspeech' | 'cloud' | 'piper';
+  provider: 'webspeech' | 'kokoro' | 'cloud' | 'piper';
 }
 
 export interface ITtsProvider {

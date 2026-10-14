@@ -54,10 +54,14 @@ export interface AppUsageEntry {
   lastSeen: number; // ms since epoch
 }
 
+/** What speaks check-ins: the OS's own voices, or Kokoro (a neural model on the GPU). */
+export type TtsEngine = 'system' | 'kokoro';
+
 /** Whether check-ins are spoken aloud, and in which voice. Persisted (ADR-009). */
 export interface SpeechSettings {
   enabled: boolean;
-  voiceId: string | null; // a system voice name; null picks one per persona
+  engine: TtsEngine;
+  voiceId: string | null; // a voice of that engine; null picks one per persona
 }
 
 /**

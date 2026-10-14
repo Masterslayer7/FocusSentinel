@@ -18,6 +18,9 @@ import { useLlmModel } from './services/llm/useLlmModel';
 import llmEvaluator from './services/llm/LlmEvaluator';
 import { useSpeakCheckIns } from './services/tts/useSpeakCheckIns';
 import { WebSpeechProvider } from './services/tts/WebSpeechProvider';
+import { KokoroProvider } from './services/tts/KokoroProvider';
+import type { ITtsProvider } from './services/tts/types';
+import type { TtsEngine } from './services/session/types';
 
 // A long session would otherwise grow these lists without bound.
 const MAX_LOG_LINES = 100;
@@ -28,7 +31,10 @@ type Tab = (typeof TABS)[number];
 
 const now = () => new Date().toLocaleTimeString();
 
-const tts = new WebSpeechProvider();
+const TTS_ENGINES: Record<TtsEngine, ITtsProvider> = {
+  system: new WebSpeechProvider(),
+  kokoro: new KokoroProvider(),
+};
 
 export default function App() {
   const { state, dispatch, isLoaded, storageError } = useAppState();
@@ -63,7 +69,7 @@ export default function App() {
     goals: openGoals,
     timeRemainingSeconds: pomodoro.status.remainingSeconds,
   });
-  const speech = useSpeakCheckIns(checkIn, tts, { ...state.speech, preset });
+  const speech = useSpeakCheckIns(checkIn, TTS_ENGINES[state.speech.engine], { ...state.speech, preset });
 
   // One line per change of app or focus state, not one per 2s sample.
   // App name and state only — never a window title.

@@ -15,7 +15,7 @@ This module manages the user interface (UI) rendering and user interactions with
     *   `components/Tabs.tsx`: Accessible tab list (arrow keys move between tabs).
     *   `components/GoalsPanel.tsx`: Add, tick off, remove and clear goals.
     *   `components/AppsPanel.tsx`: Every app used, sorted by time, each with a "counts as" select (focus / distraction / browser: judge by tab); allowed tab keywords; two-step "clear usage history".
-    *   `components/CoachPanel.tsx`: Personality picker, "Speak check-ins" switch with a voice picker and "Try voice", model picker with Load and progress, and the list of check-ins (newest first, in memory only).
+    *   `components/CoachPanel.tsx`: Personality picker, "Speak check-ins" switch, engine picker (system voices or Kokoro), voice picker and "Try voice", model picker with Load and progress, and the list of check-ins (newest first, in memory only).
     *   `components/LogConsole.tsx`: The activity log, in the Log tab.
     *   `components/format.ts`: `formatDuration` ("2m 5s") and `formatClock` ("24:30").
     *   `App.test.tsx`, `components/format.test.ts`: UI tests against the real hooks with `window.api` mocked.

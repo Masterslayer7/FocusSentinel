@@ -5,6 +5,14 @@ import * as path from 'path';
 export default defineConfig({
   plugins: [react()],
   root: path.resolve(__dirname, 'src/renderer'),
+  resolve: {
+    alias: {
+      // The ONNX runtime transformers.js loads at run time. Its package exports
+      // hide dist/, so reach it by path and bundle it, rather than letting it
+      // load from a CDN (which the CSP blocks anyway).
+      'ort-runtime': path.resolve(__dirname, 'node_modules/@huggingface/transformers/dist'),
+    },
+  },
   base: './',
   build: {
     outDir: path.resolve(__dirname, 'dist/renderer'),

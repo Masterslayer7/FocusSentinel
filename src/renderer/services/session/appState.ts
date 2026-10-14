@@ -10,7 +10,7 @@ export const DEFAULT_STATE: PersistedState = {
   pomodoro: { focusMinutes: 25, shortBreakMinutes: 5, longBreakMinutes: 15, longBreakEvery: 4 },
   modelId: null,
   appUsage: {},
-  speech: { enabled: true, voiceId: null },
+  speech: { enabled: true, engine: 'system', voiceId: null },
 };
 
 export const isPreset = (persona: string): persona is LlmPreset =>

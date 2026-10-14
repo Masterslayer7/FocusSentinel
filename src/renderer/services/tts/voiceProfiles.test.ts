@@ -1,6 +1,7 @@
 import { describe, test, expect } from 'vitest';
 import { LLM_PRESETS } from '../llm/PromptBuilder';
 import { VOICE_PROFILES, pickVoice } from './voiceProfiles';
+import { KOKORO_VOICES } from './KokoroProvider';
 import type { TtsVoice } from './types';
 
 const voice = (name: string): TtsVoice => ({ id: name, name, provider: 'webspeech' });
@@ -55,6 +56,19 @@ describe('pickVoice', () => {
     expect(pickVoice(VOICE_PROFILES['Supportive Mentor'], WINDOWS_VOICES, null)).not.toBe(
       pickVoice(VOICE_PROFILES['Drill Sergeant'], WINDOWS_VOICES, null),
     );
+  });
+
+  test('with Kokoro every persona gets its own voice, the Drill Sergeant a deep male one', () => {
+    const picks = LLM_PRESETS.map((preset) => pickVoice(VOICE_PROFILES[preset], KOKORO_VOICES, null));
+
+    expect(picks).not.toContain('');
+    expect(new Set(picks).size).toBe(picks.length);
+    expect(pickVoice(VOICE_PROFILES['Drill Sergeant'], KOKORO_VOICES, null)).toBe('am_fenrir');
+  });
+
+  test('hints match voice ids as well as names', () => {
+    const profile = { rate: 1, pitch: 1, voiceHints: ['bm_fable'], sample: 'Hi.' };
+    expect(pickVoice(profile, [{ id: 'bm_fable', name: 'Fable (British male)', provider: 'kokoro' }], null)).toBe('bm_fable');
   });
 
   test('a voice the user chose wins over the persona hint', () => {

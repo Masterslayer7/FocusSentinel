@@ -4,6 +4,9 @@ import React from 'react';
 import App from './App';
 import type { SamplerEvent, StoredState } from '../shared/types';
 
+// Kokoro's real loader would download a model; these tests only need its voice list.
+vi.mock('./services/tts/loadKokoro', () => ({ loadKokoro: vi.fn(async () => ({ generate: vi.fn() })) }));
+
 describe('FocusSentinel App React UI', () => {
   // Several hooks subscribe (tracker, usage); deliver to all, as preload does.
   let listeners: ((event: SamplerEvent) => void)[] = [];
@@ -185,7 +188,31 @@ describe('FocusSentinel App React UI', () => {
         fireEvent.change(screen.getByLabelText('Voice'), { target: { value: ZIRA } });
         await act(async () => vi.advanceTimersByTime(1000));
 
-        expect(vi.mocked(window.api.saveState).mock.calls.at(-1)?.[0].speech).toEqual({ enabled: false, voiceId: ZIRA });
+        expect(vi.mocked(window.api.saveState).mock.calls.at(-1)?.[0].speech).toEqual({
+          enabled: false,
+          engine: 'system',
+          voiceId: ZIRA,
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    test('switching to Kokoro lists its voices and saves the engine, back on Automatic', async () => {
+      vi.useFakeTimers();
+      try {
+        await renderApp({ speech: { enabled: true, engine: 'system', voiceId: ZIRA } });
+        openTab('Coach');
+
+        fireEvent.change(screen.getByLabelText('Voice engine'), { target: { value: 'kokoro' } });
+        await act(async () => vi.advanceTimersByTime(1000));
+
+        expect(screen.getByRole('option', { name: 'Fenrir (US male, deep)' })).toBeDefined();
+        expect(vi.mocked(window.api.saveState).mock.calls.at(-1)?.[0].speech).toEqual({
+          enabled: true,
+          engine: 'kokoro',
+          voiceId: null,
+        });
       } finally {
         vi.useRealTimers();
       }

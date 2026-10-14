@@ -3,7 +3,7 @@ import { LLM_PRESETS } from '../services/llm/PromptBuilder';
 import { MODEL_CHOICES } from '../services/llm/useLlmModel';
 import type { LlmStatusUpdate } from '../services/llm/LlmEvaluator';
 import type { TtsVoice } from '../services/tts/types';
-import type { SpeechSettings } from '../services/session/types';
+import type { SpeechSettings, TtsEngine } from '../services/session/types';
 
 export interface CheckInEntry {
   id: number;
@@ -30,6 +30,12 @@ const PERSONA_NOTES: Record<string, string> = {
   'Disappointed Parent': 'Gentle sigh. Reminds you what you set out to do.',
   'Sarcastic Critic': 'Teases the distraction, never you.',
   'Drill Sergeant': 'Short, firm orders back to work.',
+};
+
+const ENGINE_NOTES: Record<TtsEngine, string> = {
+  system: 'Uses the voices built into your system: instant and offline, but robotic.',
+  kokoro:
+    'Kokoro, a natural-sounding voice model that runs on your GPU, offline. The first use downloads it once (about 300 MB).',
 };
 
 const BUSY_STATES = new Set(['downloading', 'loading', 'generating']);
@@ -73,6 +79,15 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
           />
           Speak check-ins
         </label>
+        <select
+          className="select"
+          aria-label="Voice engine"
+          value={speech.engine}
+          onChange={(event) => onSpeechChange({ ...speech, engine: event.target.value as TtsEngine, voiceId: null })}
+        >
+          <option value="system">System voices</option>
+          <option value="kokoro">Kokoro (natural)</option>
+        </select>
         <div className="inline-form">
           <select
             id="voice"
@@ -93,7 +108,7 @@ export const CoachPanel: React.FC<CoachPanelProps> = ({
         <span className="field-hint">
           {voices.length === 0
             ? 'No voices found on this system, so check-ins are shown but not spoken.'
-            : 'Uses the voices built into your system, offline. Automatic gives each personality its own voice, speed and pitch.'}
+            : `${ENGINE_NOTES[speech.engine]} Automatic gives each personality its own voice.`}
         </span>
       </div>
 

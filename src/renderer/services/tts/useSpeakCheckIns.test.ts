@@ -51,6 +51,22 @@ function setup(tts: ITtsProvider, initial: { checkIn: CheckIn | null; settings?:
 const settle = () => act(async () => {});
 
 describe('useSpeakCheckIns', () => {
+  test('warms up the engine while speech is on, so the first check-in is not kept waiting', async () => {
+    const { tts } = fakeTts();
+    setup(tts, { checkIn: null });
+    await settle();
+
+    expect(tts.initialize).toHaveBeenCalled();
+  });
+
+  test('does not warm up a muted engine (Kokoro would download its model)', async () => {
+    const { tts } = fakeTts();
+    setup(tts, { checkIn: null, settings: { ...ON, enabled: false } });
+    await settle();
+
+    expect(tts.initialize).not.toHaveBeenCalled();
+  });
+
   test('returns the installed voices for the picker', async () => {
     const { tts } = fakeTts();
     const { result } = setup(tts, { checkIn: null });

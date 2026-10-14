@@ -6,9 +6,9 @@ export interface VoiceProfile {
   rate: number;
   pitch: number;
   /**
-   * Voice-name fragments to look for, best first, matched case-insensitively.
-   * The first fragments are Windows' built-in voices; the rest cover macOS and
-   * extra Windows language packs.
+   * Voice id or name fragments to look for, best first, matched
+   * case-insensitively. First a Kokoro voice id, then Windows' built-in
+   * voices, then macOS and extra Windows language packs.
    */
   voiceHints: string[];
   /** One line in character, for the voice preview. */
@@ -20,28 +20,28 @@ export const VOICE_PROFILES: Record<LlmPreset, VoiceProfile> = {
   'Drill Sergeant': {
     rate: 1.2,
     pitch: 0.6,
-    voiceHints: ['David', 'George', 'Guy', 'Daniel', 'Fred'],
+    voiceHints: ['am_fenrir', 'David', 'George', 'Guy', 'Daniel', 'Fred'],
     sample: 'Eyes front, recruit! Back to work, now!',
   },
   // Dry and quick, a touch higher than normal.
   'Sarcastic Critic': {
     rate: 1.05,
     pitch: 1.1,
-    voiceHints: ['Mark', 'Ryan', 'Alex', 'Daniel'],
+    voiceHints: ['bm_fable', 'Mark', 'Ryan', 'Alex', 'Daniel'],
     sample: 'Oh, a quick break? How original. Back to it.',
   },
   // Slow and warm.
   'Supportive Mentor': {
     rate: 0.9,
     pitch: 1.05,
-    voiceHints: ['Zira', 'Aria', 'Jenny', 'Hazel', 'Samantha'],
+    voiceHints: ['af_heart', 'Zira', 'Aria', 'Jenny', 'Hazel', 'Samantha'],
     sample: "Staying focused is hard. You're doing well, so let's get back to it.",
   },
   // Slowest of all, a little low: the sigh.
   'Disappointed Parent': {
     rate: 0.85,
     pitch: 0.9,
-    voiceHints: ['Hazel', 'Susan', 'Zira', 'Karen', 'Moira'],
+    voiceHints: ['bf_emma', 'Hazel', 'Susan', 'Zira', 'Karen', 'Moira'],
     sample: "I'm not angry. I just know you can do better than this.",
   },
 };
@@ -55,8 +55,10 @@ export function pickVoice(profile: VoiceProfile, voices: TtsVoice[], chosenVoice
   if (chosenVoiceId && voices.some((voice) => voice.id === chosenVoiceId)) {
     return chosenVoiceId;
   }
-  for (const hint of profile.voiceHints) {
-    const match = voices.find((voice) => voice.name.toLowerCase().includes(hint.toLowerCase()));
+  for (const hint of profile.voiceHints.map((hint) => hint.toLowerCase())) {
+    const match = voices.find(
+      (voice) => voice.id.toLowerCase().includes(hint) || voice.name.toLowerCase().includes(hint),
+    );
     if (match) return match.id;
   }
   return '';

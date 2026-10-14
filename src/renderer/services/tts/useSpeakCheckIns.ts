@@ -68,8 +68,10 @@ export function useSpeakCheckIns(checkIn: CheckIn | null, tts: ITtsProvider, set
     void say(checkIn.text);
   }, [checkIn, say]);
 
+  // Warm up only while speech is on: for Kokoro this downloads its model.
   useEffect(() => {
-    if (!settings.enabled) tts.stop();
+    if (settings.enabled) tts.initialize().catch(() => {}); // a failed speak retries
+    else tts.stop();
   }, [settings.enabled, tts]);
 
   useEffect(() => () => tts.stop(), [tts]);
