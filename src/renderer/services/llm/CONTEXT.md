@@ -9,6 +9,8 @@ This directory contains the core services for running local Large Language Model
 *   **Directory Manifest:**
     *   `LlmEvaluator.ts`: `LlmEvaluator` class, exported as a default singleton instance, orchestrating runtime state lifecycle, memory limits, and text evaluation tasks.
     *   `LlmEvaluator.test.ts`: Test suite verifying state handlers, guards, and templates.
+    *   `modelVariant.ts`: Picks the build of a model the GPU can run. `supportsShaderF16()` asks the WebGPU adapter for `shader-f16`; `pickModelVariant(modelId, hasShaderF16)` swaps a `q4f16_1` id for its `q4f32_1` build when f16 is missing. Without this, f16 shaders fail to compile with "Invalid ShaderModule ... index_kernel".
+    *   `modelVariant.test.ts`: Tests for the variant choice and the adapter check.
     *   `PromptBuilder.ts`: Pure utility module — persona system-prompt table, prompt assembly (`buildPrompt`), and trailing-sentence trimming (`trimTrailingIncompleteSentence`).
     *   `test-webgpu-llm.ts`: Developer diagnostic script validating raw WebGPU adapter availability. Not currently called from the UI (its former call site, the "Verify WebGPU" button, was removed with `ControlBoard`).
 *   **Integration Boundaries:**
@@ -30,6 +32,7 @@ This directory contains the core services for running local Large Language Model
 graph TD
     UI[useFocusCheckIn — once per distraction episode] -->|evaluate| Service[LlmEvaluator Singleton]
     Service -->|buildPrompt| PromptBuilder[PromptBuilder]
+    Service -->|pickModelVariant / supportsShaderF16| Variant[modelVariant]
     Service -->|CreateMLCEngine| MLC[MLCEngineInterface]
     MLC -->|Cache Storage| Storage[(Browser Cache API)]
     MLC -->|GPU Pipelines| VRAM((VRAM / GPU Memory))
@@ -45,8 +48,9 @@ sequenceDiagram
 
     UI->>LE: subscribe(listener)
     UI->>LE: initialize(modelId)
+    LE->>LE: variantId = pickModelVariant(modelId, supportsShaderF16())
     LE->>LE: state -> 'downloading' / 'loading' (parsed from initProgressCallback text)
-    LE->>MLC: CreateMLCEngine(modelId, { initProgressCallback })
+    LE->>MLC: CreateMLCEngine(variantId, { initProgressCallback })
     MLC-->>LE: engine ready
     LE->>LE: state -> 'ready'
     LE-->>UI: notify(state, progress, message)
@@ -122,7 +126,7 @@ interface EvaluatorContext {
 #### `initialize(modelId)`
 *   **Input:** `modelId: string`
 *   **Output:** `Promise<void>`
-*   **Description:** Unloads any prior model, then creates an MLC engine for `modelId`, emitting `downloading`/`loading` progress parsed from the engine's init log text, then `ready`.
+*   **Description:** Unloads any prior model, then creates an MLC engine for `modelId` — or for its `q4f32_1` build when the GPU lacks `shader-f16` (see `modelVariant.ts`) — emitting `downloading`/`loading` progress parsed from the engine's init log text, then `ready`.
 
 #### `unloadModel()`
 *   **Output:** `Promise<void>`
@@ -131,7 +135,7 @@ interface EvaluatorContext {
 #### `deleteModelFromDisk(modelId)`
 *   **Input:** `modelId: string`
 *   **Output:** `Promise<void>`
-*   **Description:** Purges the model's cached weights from the browser's Cache Storage via `deleteModelAllInfoInCache`. Resets the in-memory engine reference if the deleted model was the active one.
+*   **Description:** Purges the cached weights of the build this GPU would load (see `initialize`) from the browser's Cache Storage via `deleteModelAllInfoInCache`. Resets the in-memory engine reference if the deleted model was the active one.
 
 #### `evaluate(preset, context)`
 *   **Input:** `preset: LlmPreset`, `context: EvaluatorContext`

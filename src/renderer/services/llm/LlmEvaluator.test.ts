@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Define mocks for the web-llm engine
 const mockUnload = vi.fn().mockResolvedValue(undefined);
@@ -36,6 +36,7 @@ vi.mock('@mlc-ai/web-llm', () => {
   };
 });
 
+import { CreateMLCEngine } from '@mlc-ai/web-llm';
 import llmEvaluator from './LlmEvaluator';
 import { buildPrompt, trimTrailingIncompleteSentence, EvaluatorContext, LlmPreset } from './PromptBuilder';
 
@@ -170,6 +171,49 @@ describe('LlmEvaluator Pub/Sub Service', () => {
 
     expect(await llmEvaluator.isModelCached('cached-model')).toBe(true);
     expect(await llmEvaluator.isModelCached('new-model')).toBe(false);
+  });
+
+  describe('f16 fallback', () => {
+    const F16_ID = 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+    const F32_ID = 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC';
+
+    const stubGpu = (features: string[]) => {
+      vi.stubGlobal('navigator', {
+        ...navigator,
+        gpu: { requestAdapter: vi.fn().mockResolvedValue({ features: new Set(features) }) },
+      });
+    };
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    test('loads the f32 build when the GPU lacks shader-f16', async () => {
+      stubGpu([]);
+      vi.mocked(CreateMLCEngine).mockClear();
+
+      await llmEvaluator.initialize(F16_ID);
+
+      expect(vi.mocked(CreateMLCEngine).mock.calls[0][0]).toBe(F32_ID);
+      expect(llmEvaluator.getState()).toBe('ready');
+    });
+
+    test('loads the f16 build when the GPU supports shader-f16', async () => {
+      stubGpu(['shader-f16']);
+      vi.mocked(CreateMLCEngine).mockClear();
+
+      await llmEvaluator.initialize(F16_ID);
+
+      expect(vi.mocked(CreateMLCEngine).mock.calls[0][0]).toBe(F16_ID);
+    });
+
+    test('isModelCached checks the build this GPU would load', async () => {
+      stubGpu([]);
+
+      await llmEvaluator.isModelCached(F16_ID);
+
+      expect(mockHasModelInCache).toHaveBeenCalledWith(F32_ID);
+    });
   });
 
   test('isModelCached treats a cache lookup error as not cached', async () => {

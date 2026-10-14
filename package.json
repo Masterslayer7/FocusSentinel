@@ -2,6 +2,7 @@
   "name": "focussentinel",
   "version": "0.1.0",
   "description": "Privacy-first, local-only digital study evaluator",
+  "author": "Yug Patel",
   "main": "dist/main/main.js",
   "scripts": {
     "build": "tsc && vite build",
@@ -9,7 +10,9 @@
     "dev": "tsc && concurrently -k \"vite\" \"cross-env ELECTRON_IS_DEV=1 electron .\"",
     "start": "npm run build && electron .",
     "test:ui": "vitest run",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json && tsc -p tsconfig.main-tests.json"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.renderer.json && tsc -p tsconfig.main-tests.json",
+    "dist:win": "npm run build && electron-builder --win",
+    "pack:win": "npm run build && electron-builder --win --dir"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.1",
@@ -20,7 +23,8 @@
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^10.0.3",
     "cross-env": "^10.1.0",
-    "electron": "^30.0.0",
+    "electron": "42.11.14",
+    "electron-builder": "^26.15.3",
     "jsdom": "^29.1.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.0",
@@ -34,7 +38,53 @@
     "react-dom": "^19.2.7"
   },
   "allowScripts": {
-    "electron@30.5.1": true,
+    "electron@42.11.14": true,
     "get-windows@9.3.0": true
+  },
+  "build": {
+    "appId": "com.focussentinel.app",
+    "productName": "FocusSentinel",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/main/**/*",
+      "dist/preload/**/*",
+      "dist/shared/**/*",
+      "dist/renderer/**/*",
+      "!dist/**/*.test.js",
+      "package.json",
+      "!node_modules/@mlc-ai/**",
+      "!node_modules/react/**",
+      "!node_modules/react-dom/**",
+      "!node_modules/scheduler/**",
+      "!node_modules/get-windows/lib/binding/*darwin*/**",
+      "!node_modules/get-windows/main"
+    ],
+    "npmRebuild": false,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-portable.${ext}"
+    }
   }
 }

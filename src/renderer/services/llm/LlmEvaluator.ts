@@ -1,5 +1,6 @@
 import { CreateMLCEngine, type MLCEngineInterface, hasModelInCache, deleteModelAllInfoInCache } from "@mlc-ai/web-llm";
 import { buildPrompt, trimTrailingIncompleteSentence } from "./PromptBuilder";
+import { pickModelVariant, supportsShaderF16 } from "./modelVariant";
 import type { LlmPreset, EvaluatorContext } from "./PromptBuilder";
 
 export type { LlmPreset, EvaluatorContext };
@@ -96,12 +97,20 @@ export class LlmEvaluator {
   }
 
   /**
+   * The build of a model this GPU can run: the f32 build when the GPU lacks
+   * shader-f16, otherwise the model as named. See modelVariant.ts.
+   */
+  private async variantFor(modelId: string): Promise<string> {
+    return pickModelVariant(modelId, await supportsShaderF16());
+  }
+
+  /**
    * Whether a model's weights are already in the browser cache, so loading it
    * needs no download. A lookup failure counts as "not cached".
    */
   public async isModelCached(modelId: string): Promise<boolean> {
     try {
-      return await hasModelInCache(modelId);
+      return await hasModelInCache(await this.variantFor(modelId));
     } catch {
       return false;
     }
@@ -124,10 +133,14 @@ export class LlmEvaluator {
       await this.unloadModel();
     }
 
-    this.updateStatus('loading', 0, `Starting WebGPU engine loader for: ${modelId}`);
+    const variantId = await this.variantFor(modelId);
+    const startMessage = variantId === modelId
+      ? `Starting WebGPU engine loader for: ${modelId}`
+      : `GPU lacks shader-f16; loading ${variantId} instead of ${modelId}`;
+    this.updateStatus('loading', 0, startMessage);
 
     try {
-      const engine = await CreateMLCEngine(modelId, {
+      const engine = await CreateMLCEngine(variantId, {
         initProgressCallback: (report) => {
           // Parse percentage from logs (e.g. "Fetch 3/8: 45%")
           const progressMatch = report.text.match(/(\d+)%/);
@@ -173,11 +186,12 @@ export class LlmEvaluator {
   public async deleteModelFromDisk(modelId: string): Promise<void> {
     this.updateStatus('loading', 0, `Purging local disk cache directories for: ${modelId}`);
     try {
-      const inCache = await hasModelInCache(modelId);
+      const variantId = await this.variantFor(modelId);
+      const inCache = await hasModelInCache(variantId);
       let responseMsg = '';
 
       if (inCache) {
-        await deleteModelAllInfoInCache(modelId);
+        await deleteModelAllInfoInCache(variantId);
         responseMsg = `Successfully purged model cache for ${modelId} from disk`;
       } else {
         responseMsg = `No local cache directory found for ${modelId}`;

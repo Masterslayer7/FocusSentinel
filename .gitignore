@@ -22,3 +22,6 @@ scratch/
 .env
 .DS_Store
 Thumbs.db
+
+# Packaged builds (electron-builder)
+release/
